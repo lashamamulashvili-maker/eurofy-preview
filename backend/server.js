@@ -10,6 +10,15 @@ app.disable('x-powered-by');
 app.use(helmet());
 app.use(express.json({limit:'32kb'}));
 app.use('/api',rateLimit({windowMs:15*60*1000,limit:120,standardHeaders:'draft-7',legacyHeaders:false}));
+// Restrict browser origins; no wildcard CORS for authenticated endpoints.
+const allowedOrigins=new Set((process.env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean));
+app.use('/api',(req,res,next)=>{
+ const origin=req.get('origin');
+ if(origin&&!allowedOrigins.has(origin))return res.status(403).json({error:'Origin not allowed'});
+ if(origin){res.set('Access-Control-Allow-Origin',origin);res.set('Vary','Origin');res.set('Access-Control-Allow-Methods','GET,POST,PATCH,OPTIONS');res.set('Access-Control-Allow-Headers','Authorization,Content-Type');}
+ if(req.method==='OPTIONS')return res.status(204).end();
+ next();
+});
 const pool = process.env.DATABASE_URL ? new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSLMODE==='require'?{rejectUnauthorized:true}:undefined}) : null;
 app.get('/api/health',(_req,res)=>res.json({ok:true,databaseConfigured:Boolean(pool)}));
 app.get('/api/products',async(_req,res)=>{
@@ -19,7 +28,8 @@ app.get('/api/products',async(_req,res)=>{
   res.json({products:rows});
  }catch{res.status(500).json({error:'Unable to load products'});}
 });
-app.post('/api/register',async(req,res)=>{
+const registerLimit=rateLimit({windowMs:60*60*1000,limit:5,standardHeaders:'draft-7',legacyHeaders:false});
+app.post('/api/register',registerLimit,async(req,res)=>{
  if(!pool)return res.status(503).json({error:'Database not configured'});
  const {email,password,fullName}=req.body||{};
  if(typeof email!=='string'||!/^\S+@\S+\.\S+$/.test(email)||email.length>254||typeof password!=='string'||password.length<12||password.length>128||typeof fullName!=='string'||fullName.length>120)return res.status(400).json({error:'Invalid registration fields'});
@@ -49,7 +59,7 @@ const loginLimit=rateLimit({windowMs:15*60*1000,limit:10,standardHeaders:'draft-
 app.post('/api/login',loginLimit,async(req,res)=>{
  if(!pool)return res.status(503).json({error:'Database not configured'});
  const {email,password}=req.body||{};
- if(!emailValid(email)||typeof password!=='string'||password.length>128)return res.status(400).json({error:'Invalid credentials'});
+ if(!emailValid(email)||typeof password!=='string'||password.length<1||password.length>128)return res.status(400).json({error:'Invalid credentials'});
  try{
   const {rows}=await pool.query('SELECT id,email,full_name,role,password_hash FROM users WHERE email=$1',[email.trim().toLowerCase()]);
   const ok=rows.length?await bcrypt.compare(password,rows[0].password_hash):await bcrypt.compare(password,'$2a$12$0OLvD1D8Kp85C3hjLcfZMeHL9iK2SmT2Q7pIO2Z2HJ5Wb9xznWw4O');
@@ -74,8 +84,9 @@ app.post('/api/orders',auth,async(req,res)=>{
  const {items,deliveryName,deliveryPhone,deliveryAddress}=req.body||{};
  if(!Array.isArray(items)||items.length<1||items.length>40||items.some(i=>!i||typeof i.productId!=='string'||!/^[0-9a-f-]{36}$/i.test(i.productId)||!Number.isInteger(i.quantity)||i.quantity<1||i.quantity>20)||typeof deliveryName!=='string'||deliveryName.trim().length<2||deliveryName.length>120||typeof deliveryPhone!=='string'||deliveryPhone.length<5||deliveryPhone.length>40||typeof deliveryAddress!=='string'||deliveryAddress.trim().length<8||deliveryAddress.length>500)return res.status(400).json({error:'Invalid order fields'});
  const ids=items.map(i=>i.productId);if(new Set(ids).size!==ids.length)return res.status(400).json({error:'Duplicate products'});
- const client=await pool.connect();
+ let client;
  try{
+  client=await pool.connect();
   await client.query('BEGIN');
   const {rows}=await client.query('SELECT id,title_ka,price_gel_minor FROM products WHERE is_active=true AND id=ANY($1::uuid[])',[ids]);
   if(rows.length!==items.length){await client.query('ROLLBACK');return res.status(409).json({error:'Products unavailable'});}
@@ -87,8 +98,8 @@ app.post('/api/orders',auth,async(req,res)=>{
   for(const i of items){const p=byId.get(i.productId);await client.query('INSERT INTO order_items(order_id,product_id,product_title_snapshot,unit_price_gel_minor,quantity) VALUES($1,$2,$3,$4,$5)',[created[0].id,p.id,p.title_ka,p.price_gel_minor,i.quantity]);}
   await client.query('COMMIT');
   res.status(201).json({order:created[0],notice:'Order is unpaid. No purchase or shipment has been initiated.'});
- }catch{await client.query('ROLLBACK').catch(()=>{});res.status(500).json({error:'Order could not be created'});}
- finally{client.release();}
+ }catch{if(client)await client.query('ROLLBACK').catch(()=>{});res.status(500).json({error:'Order could not be created'});}
+ finally{if(client)client.release();}
 });
 app.get('/api/admin/orders',auth,admin,async(_req,res)=>{
  try{const {rows}=await pool.query('SELECT id,order_number,status,payment_status,total_gel_minor,created_at FROM orders ORDER BY created_at DESC LIMIT 100');res.json({orders:rows});}
