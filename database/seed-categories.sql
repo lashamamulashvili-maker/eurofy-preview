@@ -1,8 +1,8 @@
 -- EUROFY starter catalog categories. Run after schema.sql.
 -- Existing categories are preserved. No real products are seeded.
 INSERT INTO categories(name_ka,slug) VALUES
-('სახლი და ინტერიერი','home'),
-('მოდა და ტანსაცმელი','fashion'),
+('სახლი','home'),
+('მოდა','fashion'),
 ('ელექტრონიკა','electronics'),
 ('აქსესუარები','accessories'),
 ('ფეხსაცმელი','shoes'),
