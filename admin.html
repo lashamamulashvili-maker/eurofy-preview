@@ -3,7 +3,7 @@
 <section id="login"><h2>API-სთან დაკავშირება</h2><label for="api">API მისამართი (HTTPS)</label><input id="api" type="url" placeholder="https://your-staging-api.example.com" autocomplete="off"><div class="grid"><div><label for="email">ელფოსტა</label><input id="email" type="email" autocomplete="username"></div><div><label for="password">პაროლი</label><input id="password" type="password" autocomplete="current-password"></div></div><button id="connect">შესვლა</button><p id="loginmsg" role="status"></p></section>
 <div id="workspace" class="hidden"><section><h2>სესია</h2><p id="identity"></p><button id="logout">გამოსვლა</button><button id="refresh">განახლება</button><p id="status" role="status"></p></section>
 <section><h2>პროდუქტის დამატება</h2><form id="productform"><div class="grid"><div><label for="title">დასახელება</label><input id="title" required maxlength="180"></div><div><label for="price">ფასი (₾)</label><input id="price" type="number" min="0" step=".01" required></div><div><label for="sku">SKU (არასავალდებულო)</label><input id="sku" maxlength="80"></div><div><label for="image">ფოტოს HTTPS ბმული</label><input id="image" type="url" placeholder="https://"></div></div><label for="description">აღწერა</label><textarea id="description" rows="3"></textarea><label><input id="active" type="checkbox" style="width:auto"> პროდუქტის გამოქვეყნება</label><button type="submit">შენახვა</button></form></section>
-<section><h2>პროდუქტები</h2><div id="products"></div></section><section><h2>შეკვეთები</h2><div id="orders"></div></section></div></main>
+<section><h2>კატეგორიის დამატება</h2><form id="categoryform"><div class="grid"><div><label for="catname">კატეგორიის სახელი</label><input id="catname" maxlength="100" required></div><div><label for="catslug">Slug (ლათინურად)</label><input id="catslug" maxlength="100" pattern="[a-z0-9-]+" placeholder="home" required></div></div><button type="submit">კატეგორიის შენახვა</button></form><div id="categories"></div></section><section><h2>პროდუქტები</h2><div id="products"></div></section><section><h2>შეკვეთები</h2><div id="orders"></div></section></div></main>
 <script>
 let token='',base='';
 const el=id=>document.getElementById(id);
@@ -27,7 +27,8 @@ el('connect').onclick=async()=>{
 };
 async function refresh(){
  try{
-  const [products,orders]=await Promise.all([request('/api/admin/products'),request('/api/admin/orders')]);
+  const [products,orders,categories]=await Promise.all([request('/api/admin/products'),request('/api/admin/orders'),request('/api/categories')]);
+  const c=el('categories');c.replaceChildren();for(const category of categories.categories){const row=document.createElement('div');row.className='item';row.textContent=category.name_ka+' · '+category.slug;c.append(row)}
   const p=el('products');p.replaceChildren();
   if(!products.products.length)p.textContent='პროდუქცია ჯერ არ არის.';
   for(const product of products.products){
@@ -46,6 +47,10 @@ async function refresh(){
 }
 el('refresh').onclick=refresh;
 el('logout').onclick=async()=>{await request('/api/logout',{method:'POST'}).catch(()=>{});token='';base='';el('workspace').classList.add('hidden');el('login').classList.remove('hidden');show('loginmsg','სესია დასრულდა')};
+el('categoryform').onsubmit=async e=>{
+ e.preventDefault();
+ try{await request('/api/admin/categories',{method:'POST',body:JSON.stringify({name:el('catname').value,slug:el('catslug').value})});el('categoryform').reset();await refresh()}catch(err){show('status',err.message,true)}
+};
 el('productform').onsubmit=async e=>{
  e.preventDefault();const price=Number(el('price').value);
  if(!Number.isFinite(price)||price<0||Math.round(price*100)>100000000){show('status','არასწორი ფასი',true);return}
