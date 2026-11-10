@@ -1,0 +1,54 @@
+<!doctype html><html lang="ka"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>EUROFY — ადმინისტრაცია (Staging)</title><style>
+*{box-sizing:border-box}body{margin:0;background:#f6f7f5;color:#202520;font:15px/1.6 system-ui,sans-serif}header{background:#171717;color:white;padding:19px 22px}header b{font:26px Georgia,serif}main{max-width:1050px;margin:30px auto;padding:0 20px}section{background:white;border:1px solid #e5e8e4;border-radius:8px;padding:24px;margin-bottom:20px}h1{font:normal 30px Georgia,serif}h2{font:normal 23px Georgia,serif}label{display:block;margin:12px 0 4px}input,textarea,select{width:100%;border:1px solid #cdd5cf;padding:11px;border-radius:4px;font:inherit}button{background:#10392c;color:white;border:0;padding:11px 17px;border-radius:4px;cursor:pointer;margin:10px 7px 0 0}.muted{color:#657268}.danger{color:#8c2b2b}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}.item{border-bottom:1px solid #e6e8e5;padding:12px 0}.hidden{display:none}small{display:block;color:#66756a}@media(max-width:650px){.grid{grid-template-columns:1fr}section{padding:17px}}</style></head><body><header><b>EUROFY.ge</b> · ადმინისტრაცია / Staging</header><main><h1>მართვის პანელის საფუძველი</h1><p class="muted">ეს გვერდი მუშაობს მხოლოდ ცალკე გაშვებულ EUROFY API-სთან. საჯარო Preview-ზე მონაცემთა ბაზა არ არის დაკავშირებული. ნუ გამოიყენებ რეალურ მონაცემებს, სანამ სერვერის უსაფრთხოება არ შემოწმდება.</p>
+<section id="login"><h2>API-სთან დაკავშირება</h2><label for="api">API მისამართი (HTTPS)</label><input id="api" type="url" placeholder="https://your-staging-api.example.com" autocomplete="off"><div class="grid"><div><label for="email">ელფოსტა</label><input id="email" type="email" autocomplete="username"></div><div><label for="password">პაროლი</label><input id="password" type="password" autocomplete="current-password"></div></div><button id="connect">შესვლა</button><p id="loginmsg" role="status"></p></section>
+<div id="workspace" class="hidden"><section><h2>სესია</h2><p id="identity"></p><button id="logout">გამოსვლა</button><button id="refresh">განახლება</button><p id="status" role="status"></p></section>
+<section><h2>პროდუქტის დამატება</h2><form id="productform"><div class="grid"><div><label for="title">დასახელება</label><input id="title" required maxlength="180"></div><div><label for="price">ფასი (₾)</label><input id="price" type="number" min="0" step=".01" required></div><div><label for="sku">SKU (არასავალდებულო)</label><input id="sku" maxlength="80"></div><div><label for="image">ფოტოს HTTPS ბმული</label><input id="image" type="url" placeholder="https://"></div></div><label for="description">აღწერა</label><textarea id="description" rows="3"></textarea><label><input id="active" type="checkbox" style="width:auto"> პროდუქტის გამოქვეყნება</label><button type="submit">შენახვა</button></form></section>
+<section><h2>პროდუქტები</h2><div id="products"></div></section><section><h2>შეკვეთები</h2><div id="orders"></div></section></div></main>
+<script>
+let token='',base='';
+const el=id=>document.getElementById(id);
+const show=(id,text,err=false)=>{el(id).textContent=text;el(id).className=err?'danger':'muted'};
+async function request(path,options={}){
+ const response=await fetch(base+path,{...options,headers:{'Content-Type':'application/json',...(token?{'Authorization':'Bearer '+token}:{}),...(options.headers||{})},cache:'no-store'});
+ const body=response.status===204?{}:await response.json().catch(()=>({}));
+ if(!response.ok)throw Error(body.error||'HTTP '+response.status);
+ return body;
+}
+el('connect').onclick=async()=>{
+ const url=el('api').value.trim().replace(/\/$/,'');
+ if(!/^https:\/\/[a-z0-9.-]+(?::\d+)?$/i.test(url)){show('loginmsg','შეიყვანე HTTPS API მისამართი.',true);return}
+ base=url;show('loginmsg','დაკავშირება...');
+ try{
+  const result=await request('/api/login',{method:'POST',body:JSON.stringify({email:el('email').value,password:el('password').value})});
+  if(result.user?.role!=='admin'){token=result.token;await request('/api/logout',{method:'POST'}).catch(()=>{});token='';throw Error('ადმინისტრატორის უფლება არ გაქვს')}
+  token=result.token;el('password').value='';el('identity').textContent=result.user.email+' · admin';
+  el('login').classList.add('hidden');el('workspace').classList.remove('hidden');await refresh();
+ }catch(e){show('loginmsg',e.message,true)}
+};
+async function refresh(){
+ try{
+  const [products,orders]=await Promise.all([request('/api/admin/products'),request('/api/admin/orders')]);
+  const p=el('products');p.replaceChildren();
+  if(!products.products.length)p.textContent='პროდუქცია ჯერ არ არის.';
+  for(const product of products.products){
+   const row=document.createElement('div');row.className='item';
+   const title=document.createElement('strong');title.textContent=product.title_ka+' · '+(product.price_gel_minor/100).toFixed(2)+' ₾';
+   const detail=document.createElement('small');detail.textContent=(product.sku||'SKU არ არის')+' · '+(product.is_active?'გამოქვეყნებულია':'დამალულია');
+   const btn=document.createElement('button');btn.textContent=product.is_active?'დამალვა':'გამოქვეყნება';
+   btn.onclick=async()=>{try{await request('/api/admin/products/'+product.id,{method:'PATCH',body:JSON.stringify({active:!product.is_active})});await refresh()}catch(e){show('status',e.message,true)}};
+   row.append(title,detail,btn);p.append(row);
+  }
+  const o=el('orders');o.replaceChildren();
+  if(!orders.orders.length)o.textContent='შეკვეთები ჯერ არ არის.';
+  for(const order of orders.orders){const row=document.createElement('div');row.className='item';row.textContent=order.order_number+' · '+order.status+' · '+order.payment_status+' · '+(order.total_gel_minor/100).toFixed(2)+' ₾';o.append(row)}
+  show('status','მონაცემები განახლებულია');
+ }catch(e){show('status',e.message,true)}
+}
+el('refresh').onclick=refresh;
+el('logout').onclick=async()=>{await request('/api/logout',{method:'POST'}).catch(()=>{});token='';base='';el('workspace').classList.add('hidden');el('login').classList.remove('hidden');show('loginmsg','სესია დასრულდა')};
+el('productform').onsubmit=async e=>{
+ e.preventDefault();const price=Number(el('price').value);
+ if(!Number.isFinite(price)||price<0||Math.round(price*100)>100000000){show('status','არასწორი ფასი',true);return}
+ try{await request('/api/admin/products',{method:'POST',body:JSON.stringify({title:el('title').value,priceMinor:Math.round(price*100),description:el('description').value,sku:el('sku').value||null,imageUrl:el('image').value||null,active:el('active').checked})});el('productform').reset();await refresh()}catch(err){show('status',err.message,true)}
+};
+</script></body></html>
