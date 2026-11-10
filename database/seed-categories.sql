@@ -7,6 +7,7 @@ INSERT INTO categories(name_ka,slug) VALUES
 ('აქსესუარები','accessories'),
 ('ფეხსაცმელი','shoes'),
 ('სილამაზე და მოვლა','beauty'),
+('თავის მოვლის საშუალებები','personal-care'),
 ('ჯანმრთელობა და ჰიგიენა','health'),
 ('ბავშვები და სათამაშოები','kids'),
 ('სპორტი და ფიტნესი','sports'),
