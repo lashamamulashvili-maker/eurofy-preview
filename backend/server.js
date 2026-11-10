@@ -119,7 +119,7 @@ app.patch('/api/admin/products/:id',auth,admin,async(req,res)=>{
  }
  if(!fields.length)return res.status(400).json({error:'No fields'});
  values.push(req.params.id);
- try{const {rows}=await pool.query('UPDATE products SET '+fields.join(',')+' WHERE id=+' RETURNING *',values);if(!rows.length)return res.status(404).json({error:'Not found'});res.json({product:rows[0]});}
+ try{const {rows}=await pool.query('UPDATE products SET '+fields.join(',')+' WHERE id=$'+values.length+' RETURNING *',values);if(!rows.length)return res.status(404).json({error:'Not found'});res.json({product:rows[0]});}
  catch{res.status(500).json({error:'Product could not be updated'});}
 });
 app.get('/api/categories',async(_req,res)=>{
