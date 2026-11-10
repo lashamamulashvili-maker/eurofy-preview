@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import pg from 'pg';
 import bcrypt from 'bcryptjs';
+import {randomBytes,createHash} from 'node:crypto';
 
 const app = express();
 app.disable('x-powered-by');
@@ -27,6 +28,71 @@ app.post('/api/register',async(req,res)=>{
   const {rows}=await pool.query('INSERT INTO users(email,password_hash,full_name) VALUES($1,$2,$3) RETURNING id,email,full_name',[email.trim().toLowerCase(),hash,fullName.trim()]);
   res.status(201).json({user:rows[0]});
  }catch(e){res.status(e.code==='23505'?409:500).json({error:e.code==='23505'?'Email already registered':'Registration failed'});}
+});
+
+// Authentication is via bearer tokens, never via a URL or browser localStorage.
+// This API is not publicly deployed; production deployment needs HTTPS and an audited client.
+const tokenHash=t=>createHash('sha256').update(t).digest('hex');
+const emailValid=e=>typeof e==='string'&&e.length<=254&&/^\S+@\S+\.\S+$/.test(e);
+async function auth(req,res,next){
+ if(!pool)return res.status(503).json({error:'Database not configured'});
+ const match=/^Bearer ([a-f0-9]{64})$/.exec(req.get('authorization')||'');
+ if(!match)return res.status(401).json({error:'Authentication required'});
+ try{
+  const {rows}=await pool.query('SELECT u.id,u.email,u.full_name,u.role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now()',[tokenHash(match[1])]);
+  if(!rows.length)return res.status(401).json({error:'Invalid or expired session'});
+  req.user=rows[0];req.sessionHash=tokenHash(match[1]);next();
+ }catch{res.status(500).json({error:'Authentication unavailable'});}
+}
+function admin(req,res,next){if(req.user.role!=='admin')return res.status(403).json({error:'Forbidden'});next();}
+const loginLimit=rateLimit({windowMs:15*60*1000,limit:10,standardHeaders:'draft-7',legacyHeaders:false});
+app.post('/api/login',loginLimit,async(req,res)=>{
+ if(!pool)return res.status(503).json({error:'Database not configured'});
+ const {email,password}=req.body||{};
+ if(!emailValid(email)||typeof password!=='string'||password.length>128)return res.status(400).json({error:'Invalid credentials'});
+ try{
+  const {rows}=await pool.query('SELECT id,email,full_name,role,password_hash FROM users WHERE email=$1',[email.trim().toLowerCase()]);
+  const ok=rows.length?await bcrypt.compare(password,rows[0].password_hash):await bcrypt.compare(password,'$2a$12$0OLvD1D8Kp85C3hjLcfZMeHL9iK2SmT2Q7pIO2Z2HJ5Wb9xznWw4O');
+  if(!ok)return res.status(401).json({error:'Invalid credentials'});
+  const token=randomBytes(32).toString('hex');
+  await pool.query("INSERT INTO sessions(user_id,token_hash,expires_at) VALUES($1,$2,now()+interval '7 days')",[rows[0].id,tokenHash(token)]);
+  const {password_hash,...user}=rows[0];
+  res.set('Cache-Control','no-store').json({token,user,expiresInSeconds:604800});
+ }catch{res.status(500).json({error:'Login unavailable'});}
+});
+app.get('/api/me',auth,(req,res)=>res.set('Cache-Control','no-store').json({user:req.user}));
+app.post('/api/logout',auth,async(req,res)=>{
+ try{await pool.query('DELETE FROM sessions WHERE token_hash=$1',[req.sessionHash]);res.status(204).end();}
+ catch{res.status(500).json({error:'Logout failed'});}
+});
+app.get('/api/my-orders',auth,async(req,res)=>{
+ try{const {rows}=await pool.query('SELECT id,order_number,status,payment_status,total_gel_minor,created_at FROM orders WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100',[req.user.id]);res.json({orders:rows});}
+ catch{res.status(500).json({error:'Unable to load orders'});}
+});
+// Orders remain unpaid until a separately integrated payment provider verifies payment.
+app.post('/api/orders',auth,async(req,res)=>{
+ const {items,deliveryName,deliveryPhone,deliveryAddress}=req.body||{};
+ if(!Array.isArray(items)||items.length<1||items.length>40||items.some(i=>!i||typeof i.productId!=='string'||!/^[0-9a-f-]{36}$/i.test(i.productId)||!Number.isInteger(i.quantity)||i.quantity<1||i.quantity>20)||typeof deliveryName!=='string'||deliveryName.trim().length<2||deliveryName.length>120||typeof deliveryPhone!=='string'||deliveryPhone.length<5||deliveryPhone.length>40||typeof deliveryAddress!=='string'||deliveryAddress.trim().length<8||deliveryAddress.length>500)return res.status(400).json({error:'Invalid order fields'});
+ const ids=items.map(i=>i.productId);if(new Set(ids).size!==ids.length)return res.status(400).json({error:'Duplicate products'});
+ const client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+  const {rows}=await client.query('SELECT id,title_ka,price_gel_minor FROM products WHERE is_active=true AND id=ANY($1::uuid[])',[ids]);
+  if(rows.length!==items.length){await client.query('ROLLBACK');return res.status(409).json({error:'Products unavailable'});}
+  const byId=new Map(rows.map(p=>[p.id,p]));
+  const total=items.reduce((n,i)=>n+byId.get(i.productId).price_gel_minor*i.quantity,0);
+  if(!Number.isSafeInteger(total)||total<0)throw Error('Invalid total');
+  const number='EF-'+Date.now().toString(36).toUpperCase()+'-'+randomBytes(4).toString('hex').toUpperCase();
+  const {rows:created}=await client.query('INSERT INTO orders(order_number,user_id,total_gel_minor,delivery_name,delivery_phone,delivery_address) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,order_number,status,payment_status,total_gel_minor',[number,req.user.id,total,deliveryName.trim(),deliveryPhone.trim(),deliveryAddress.trim()]);
+  for(const i of items){const p=byId.get(i.productId);await client.query('INSERT INTO order_items(order_id,product_id,product_title_snapshot,unit_price_gel_minor,quantity) VALUES($1,$2,$3,$4,$5)',[created[0].id,p.id,p.title_ka,p.price_gel_minor,i.quantity]);}
+  await client.query('COMMIT');
+  res.status(201).json({order:created[0],notice:'Order is unpaid. No purchase or shipment has been initiated.'});
+ }catch{await client.query('ROLLBACK').catch(()=>{});res.status(500).json({error:'Order could not be created'});}
+ finally{client.release();}
+});
+app.get('/api/admin/orders',auth,admin,async(_req,res)=>{
+ try{const {rows}=await pool.query('SELECT id,order_number,status,payment_status,total_gel_minor,created_at FROM orders ORDER BY created_at DESC LIMIT 100');res.json({orders:rows});}
+ catch{res.status(500).json({error:'Unable to load orders'});}
 });
 app.use('/api',(_req,res)=>res.status(404).json({error:'Not found'}));
 const port=Number(process.env.PORT||3000);
