@@ -61,3 +61,20 @@ CREATE TABLE IF NOT EXISTS shipments (
 );
 CREATE INDEX IF NOT EXISTS orders_user_created_idx ON orders(user_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS shipments_tracking_idx ON shipments(tracking_number);
+
+-- Server-managed opaque sessions; only SHA-256 token digests are stored.
+CREATE TABLE IF NOT EXISTS sessions (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ token_hash text NOT NULL UNIQUE,
+ expires_at timestamptz NOT NULL,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions(expires_at);
+-- Explicitly mark unpaid/test orders; no payment provider is connected.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status text NOT NULL DEFAULT 'unpaid'
+ CHECK (payment_status IN ('unpaid','pending','paid','refunded'));
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_name text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_phone text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_address text;
