@@ -94,6 +94,51 @@ app.get('/api/admin/orders',auth,admin,async(_req,res)=>{
  try{const {rows}=await pool.query('SELECT id,order_number,status,payment_status,total_gel_minor,created_at FROM orders ORDER BY created_at DESC LIMIT 100');res.json({orders:rows});}
  catch{res.status(500).json({error:'Unable to load orders'});}
 });
+
+const safeText=(v,max)=>typeof v==='string'&&v.trim().length>0&&v.length<=max;
+const uuid=v=>typeof v==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+app.get('/api/admin/products',auth,admin,async(_req,res)=>{
+ try{const {rows}=await pool.query('SELECT id,category_id,title_ka,description_ka,price_gel_minor,image_url,sku,is_active,created_at FROM products ORDER BY created_at DESC LIMIT 200');res.json({products:rows});}
+ catch{res.status(500).json({error:'Unable to load products'});}
+});
+app.post('/api/admin/products',auth,admin,async(req,res)=>{
+ const {title,description='',priceMinor,categoryId=null,imageUrl=null,sku=null,active=false}=req.body||{};
+ if(!safeText(title,180)||typeof description!=='string'||description.length>5000||!Number.isSafeInteger(priceMinor)||priceMinor<0||priceMinor>100000000||categoryId!==null&&!uuid(categoryId)||imageUrl!==null&&(typeof imageUrl!=='string'||imageUrl.length>1000||!/^https:\/\//.test(imageUrl))||sku!==null&&!safeText(sku,80)||typeof active!=='boolean')return res.status(400).json({error:'Invalid product'});
+ try{const {rows}=await pool.query('INSERT INTO products(title_ka,description_ka,price_gel_minor,category_id,image_url,sku,is_active) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',[title.trim(),description,priceMinor,categoryId,imageUrl,sku,active]);res.status(201).json({product:rows[0]});}
+ catch(e){res.status(e.code==='23505'?409:500).json({error:'Product could not be created'});}
+});
+app.patch('/api/admin/products/:id',auth,admin,async(req,res)=>{
+ if(!uuid(req.params.id))return res.status(400).json({error:'Invalid id'});
+ const allowed={title_ka:'title',description_ka:'description',price_gel_minor:'priceMinor',category_id:'categoryId',image_url:'imageUrl',sku:'sku',is_active:'active'};
+ const fields=[];const values=[];
+ for(const [column,key] of Object.entries(allowed))if(Object.hasOwn(req.body||{},key)){
+  const v=req.body[key];
+  const valid=key==='title'?safeText(v,180):key==='description'?typeof v==='string'&&v.length<=5000:key==='priceMinor'?Number.isSafeInteger(v)&&v>=0&&v<=100000000:key==='categoryId'?v===null||uuid(v):key==='imageUrl'?v===null||typeof v==='string'&&v.length<=1000&&/^https:\/\//.test(v):key==='sku'?v===null||safeText(v,80):typeof v==='boolean';
+  if(!valid)return res.status(400).json({error:'Invalid '+key});
+  values.push(key==='title'?v.trim():v);fields.push(column+'=
+const port=Number(process.env.PORT||3000);
+app.listen(port,()=>console.log('EUROFY API listening on '+port));
++values.length);
+ }
+ if(!fields.length)return res.status(400).json({error:'No fields'});
+ values.push(req.params.id);
+ try{const {rows}=await pool.query('UPDATE products SET '+fields.join(',')+' WHERE id=
+const port=Number(process.env.PORT||3000);
+app.listen(port,()=>console.log('EUROFY API listening on '+port));
++values.length+' RETURNING *',values);if(!rows.length)return res.status(404).json({error:'Not found'});res.json({product:rows[0]});}
+ catch{res.status(500).json({error:'Product could not be updated'});}
+});
+app.get('/api/categories',async(_req,res)=>{
+ if(!pool)return res.status(503).json({error:'Database not configured'});
+ try{const {rows}=await pool.query('SELECT id,name_ka,slug FROM categories ORDER BY name_ka');res.json({categories:rows});}
+ catch{res.status(500).json({error:'Unable to load categories'});}
+});
+app.post('/api/admin/categories',auth,admin,async(req,res)=>{
+ const {name,slug}=req.body||{};
+ if(!safeText(name,100)||!safeText(slug,100)||!/^[a-z0-9-]+$/.test(slug))return res.status(400).json({error:'Invalid category'});
+ try{const {rows}=await pool.query('INSERT INTO categories(name_ka,slug) VALUES($1,$2) RETURNING *',[name.trim(),slug]);res.status(201).json({category:rows[0]});}
+ catch(e){res.status(e.code==='23505'?409:500).json({error:'Category could not be created'});}
+});
 app.use('/api',(_req,res)=>res.status(404).json({error:'Not found'}));
 const port=Number(process.env.PORT||3000);
 app.listen(port,()=>console.log('EUROFY API listening on '+port));
