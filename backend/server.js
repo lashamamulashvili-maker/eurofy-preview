@@ -133,20 +133,6 @@ app.post('/api/admin/categories',auth,admin,async(req,res)=>{
  try{const {rows}=await pool.query('INSERT INTO categories(name_ka,slug) VALUES($1,$2) RETURNING *',[name.trim(),slug]);res.status(201).json({category:rows[0]});}
  catch(e){res.status(e.code==='23505'?409:500).json({error:'Category could not be created'});}
 });
-+values.length+' RETURNING *',values);if(!rows.length)return res.status(404).json({error:'Not found'});res.json({product:rows[0]});}
- catch{res.status(500).json({error:'Product could not be updated'});}
-});
-app.get('/api/categories',async(_req,res)=>{
- if(!pool)return res.status(503).json({error:'Database not configured'});
- try{const {rows}=await pool.query('SELECT id,name_ka,slug FROM categories ORDER BY name_ka');res.json({categories:rows});}
- catch{res.status(500).json({error:'Unable to load categories'});}
-});
-app.post('/api/admin/categories',auth,admin,async(req,res)=>{
- const {name,slug}=req.body||{};
- if(!safeText(name,100)||!safeText(slug,100)||!/^[a-z0-9-]+$/.test(slug))return res.status(400).json({error:'Invalid category'});
- try{const {rows}=await pool.query('INSERT INTO categories(name_ka,slug) VALUES($1,$2) RETURNING *',[name.trim(),slug]);res.status(201).json({category:rows[0]});}
- catch(e){res.status(e.code==='23505'?409:500).json({error:'Category could not be created'});}
-});
 app.use('/api',(_req,res)=>res.status(404).json({error:'Not found'}));
 const port=Number(process.env.PORT||3000);
 app.listen(port,()=>console.log('EUROFY API listening on '+port));
