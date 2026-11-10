@@ -114,8 +114,7 @@ app.patch('/api/admin/products/:id',auth,admin,async(req,res)=>{
   const v=req.body[key];
   const valid=key==='title'?safeText(v,180):key==='description'?typeof v==='string'&&v.length<=5000:key==='priceMinor'?Number.isSafeInteger(v)&&v>=0&&v<=100000000:key==='categoryId'?v===null||uuid(v):key==='imageUrl'?v===null||typeof v==='string'&&v.length<=1000&&/^https:\/\//.test(v):key==='sku'?v===null||safeText(v,80):typeof v==='boolean';
   if(!valid)return res.status(400).json({error:'Invalid '+key});
-  values.push(key==='title'?v.trim():v);fields.push(column+'=
-+values.length);
+  values.push(key==='title'?v.trim():v);fields.push(column+'=$'+values.length);
  }
  if(!fields.length)return res.status(400).json({error:'No fields'});
  values.push(req.params.id);
