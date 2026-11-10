@@ -1,0 +1,3 @@
+User-agent: *
+Disallow: /
+# Preview environment; enable indexing only on approved production domain.
