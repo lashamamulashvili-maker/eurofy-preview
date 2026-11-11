@@ -36,13 +36,17 @@ async function eurGelRate(){
 }
 app.get('/api/exchange-rate',async(_req,res)=>{try{const {rate,date,source}=await eurGelRate();res.json({base:'EUR',quote:'GEL',rate,date,source,indicative:true});}catch{res.status(503).json({error:'Official exchange rate unavailable'});}});
 const pool = process.env.DATABASE_URL ? new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSLMODE==='require'?{rejectUnauthorized:true}:undefined}) : null;
-app.get('/api/health',(_req,res)=>res.json({ok:true,databaseConfigured:Boolean(pool)}));
+app.get('/api/health',async(_req,res)=>{
+ if(!pool)return res.json({ok:true,databaseConfigured:false,databaseConnected:false});
+ try{await pool.query('SELECT 1');res.json({ok:true,databaseConfigured:true,databaseConnected:true});}
+ catch(e){console.error('Database connectivity check failed:',{code:e.code||'UNKNOWN',message:e.message});res.status(503).json({ok:false,databaseConfigured:true,databaseConnected:false});}
+});
 app.get('/api/products',async(_req,res)=>{
  if(!pool)return res.status(503).json({error:'Database not configured'});
  try{
   const {rows}=await pool.query('SELECT p.id,p.title_ka,p.description_ka,p.price_gel_minor,p.original_price_gel_minor,p.image_url,c.name_ka AS category FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.is_active=true ORDER BY p.created_at DESC LIMIT 100');
   res.json({products:rows});
- }catch{res.status(500).json({error:'Unable to load products'});}
+ }catch(e){console.error('Product catalog query failed:',{code:e.code||'UNKNOWN',message:e.message});res.status(500).json({error:'Unable to load products'});}
 });
 const registerLimit=rateLimit({windowMs:60*60*1000,limit:5,standardHeaders:'draft-7',legacyHeaders:false});
 app.post('/api/register',registerLimit,async(req,res)=>{
