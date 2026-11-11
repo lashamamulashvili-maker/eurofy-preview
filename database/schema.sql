@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
  full_name text NOT NULL DEFAULT '',
  phone text NOT NULL DEFAULT '',
  address text NOT NULL DEFAULT '',
+ city text NOT NULL DEFAULT '',
  role text NOT NULL DEFAULT 'customer' CHECK (role IN ('customer','admin')),
  created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -95,3 +96,8 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS markup_override_percent numeric(7,
 ALTER TABLE products ADD COLUMN IF NOT EXISTS fixed_price_gel_minor integer CHECK(fixed_price_gel_minor>=0);
 ALTER TABLE products ADD COLUMN IF NOT EXISTS discount_verified boolean NOT NULL DEFAULT false;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS original_price_gel_minor integer CHECK(original_price_gel_minor>=0);
+
+-- Residence and selected parcel pickup are separate fields.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS city text NOT NULL DEFAULT '';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_city text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_location text;
