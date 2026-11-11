@@ -84,3 +84,14 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_address text;
 -- Migration for an existing EUROFY users table (safe to rerun).
 ALTER TABLE users ADD COLUMN IF NOT EXISTS phone text NOT NULL DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS address text NOT NULL DEFAULT '';
+
+-- EUROFY pricing: supplier inputs are in GEL minor units, never guessed FX.
+CREATE TABLE IF NOT EXISTS pricing_settings(id integer PRIMARY KEY DEFAULT 1 CHECK(id=1),default_markup_percent numeric(7,2) NOT NULL DEFAULT 30 CHECK(default_markup_percent BETWEEN 0 AND 500),shipping_gel_minor integer NOT NULL DEFAULT 0 CHECK(shipping_gel_minor BETWEEN 0 AND 100000000));
+INSERT INTO pricing_settings(id) VALUES(1) ON CONFLICT DO NOTHING;
+CREATE TABLE IF NOT EXISTS category_markups(category_id uuid PRIMARY KEY REFERENCES categories(id) ON DELETE CASCADE,markup_percent numeric(7,2) NOT NULL CHECK(markup_percent BETWEEN 0 AND 500));
+ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_price_gel_minor integer CHECK(supplier_price_gel_minor>=0);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_original_gel_minor integer CHECK(supplier_original_gel_minor>=0);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS markup_override_percent numeric(7,2) CHECK(markup_override_percent BETWEEN 0 AND 500);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS fixed_price_gel_minor integer CHECK(fixed_price_gel_minor>=0);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS discount_verified boolean NOT NULL DEFAULT false;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS original_price_gel_minor integer CHECK(original_price_gel_minor>=0);
