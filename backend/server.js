@@ -102,8 +102,24 @@ app.post('/api/orders',auth,async(req,res)=>{
  finally{if(client)client.release();}
 });
 app.get('/api/admin/orders',auth,admin,async(_req,res)=>{
- try{const {rows}=await pool.query('SELECT id,order_number,status,payment_status,total_gel_minor,created_at FROM orders ORDER BY created_at DESC LIMIT 100');res.json({orders:rows});}
- catch{res.status(500).json({error:'Unable to load orders'});}
+ try{const {rows}=await pool.query('SELECT o.id,o.order_number,o.status,o.payment_status,o.total_gel_minor,o.created_at,o.pickup_city,o.pickup_location,o.supplier_order_reference,o.parcel_tracking_number,o.fulfillment_note,u.email AS customer_email FROM orders o LEFT JOIN users u ON u.id=o.user_id ORDER BY o.created_at DESC LIMIT 100');res.json({orders:rows});}
+ catch{res.status(500).json({error:'Unable to load orders; apply schema migration'});}
+});
+const fulfillmentStages=['pending','confirmed','purchased','received_in_germany','in_transit','ready_for_pickup','delivered'];
+app.patch('/api/admin/orders/:id/fulfillment',auth,admin,async(req,res)=>{
+ const {status,supplierOrderReference,trackingNumber,note}=req.body||{};
+ if(!uuid(req.params.id)||!fulfillmentStages.includes(status)&&status!=='cancelled'||[supplierOrderReference,trackingNumber,note].some(v=>v!==undefined&&(typeof v!=='string'||v.length>500)))return res.status(400).json({error:'Invalid fulfillment fields'});
+ try{
+  const {rows}=await pool.query('SELECT status,payment_status FROM orders WHERE id=$1',[req.params.id]);
+  if(!rows.length)return res.status(404).json({error:'Order not found'});
+  const previous=rows[0].status;
+  if(previous==='cancelled'||previous==='delivered')return res.status(409).json({error:'Order is closed'});
+  const allowed=status==='cancelled'||status===previous||fulfillmentStages.indexOf(status)===fulfillmentStages.indexOf(previous)+1;
+  if(!allowed)return res.status(409).json({error:'Complete fulfillment stages in order'});
+  if(status==='purchased'&&rows[0].payment_status!=='paid')return res.status(409).json({error:'Payment must be verified before purchasing from supplier'});
+  const updated=await pool.query('UPDATE orders SET status=$2,supplier_order_reference=COALESCE($3,supplier_order_reference),parcel_tracking_number=COALESCE($4,parcel_tracking_number),fulfillment_note=COALESCE($5,fulfillment_note) WHERE id=$1 RETURNING id,order_number,status,payment_status',[req.params.id,status,supplierOrderReference?.trim(),trackingNumber?.trim(),note?.trim()]);
+  res.json({order:updated.rows[0]});
+ }catch{res.status(500).json({error:'Unable to update fulfillment'});}
 });
 const safeText=(v,max)=>typeof v==='string'&&v.trim().length>0&&v.length<=max;
 const uuid=v=>typeof v==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
