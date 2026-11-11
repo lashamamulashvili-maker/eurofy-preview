@@ -108,3 +108,11 @@ ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('pending
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS supplier_order_reference text;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS parcel_tracking_number text;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS fulfillment_note text NOT NULL DEFAULT '';
+
+-- Supplier data is private, never exposed by public product API.
+ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_name text;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_product_url text;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_stock_quantity integer CHECK (supplier_stock_quantity>=0);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_availability text NOT NULL DEFAULT 'unknown' CHECK(supplier_availability IN ('unknown','in_stock','out_of_stock'));
+ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_last_synced_at timestamptz;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_sync_source text;
