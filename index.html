@@ -123,11 +123,30 @@ function setLanguage(lang){if(!['ka','en','ru'].includes(lang))return;currentLan
 const eurofyInterests=Object.create(null);
 function eurofyRemember(category,weight=1){if(category&&category!=='ყველა'&&category!=='SALE')eurofyInterests[category]=Math.min(50,(eurofyInterests[category]||0)+weight)}
 function eurofyShuffle(items){const out=[...items];for(let i=out.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[out[i],out[j]]=[out[j],out[i]]}return out}
-function eurofyHomeProducts(){const shuffled=eurofyShuffle(products);const interests=Object.entries(eurofyInterests).sort((a,b)=>b[1]-a[1]);if(!interests.length)return shuffled.slice(0,4);const preferred=shuffled.filter(p=>interests.some(([cat])=>cat===p.cat));const discovery=shuffled.filter(p=>!interests.some(([cat])=>cat===p.cat));return [...preferred.slice(0,3),...discovery.slice(0,Math.max(0,4-Math.min(3,preferred.length))),...preferred.slice(3)].slice(0,4)}
+function eurofyHomeProducts(){
+ // Prefer 70% relevant / 30% discovery, rounded to available unique products.
+ // No interest history means fully shuffled discovery; no duplicate product cards.
+ const shuffled=eurofyShuffle(products.filter(p=>p&&p.id!=null));
+ const limit=Math.min(10,shuffled.length);
+ const interests=Object.entries(eurofyInterests).filter(([,weight])=>weight>0);
+ if(!interests.length)return shuffled.slice(0,limit);
+ const relevant=shuffled.filter(p=>interests.some(([cat])=>cat===p.cat));
+ const other=shuffled.filter(p=>!interests.some(([cat])=>cat===p.cat));
+ const targetRelevant=Math.round(limit*0.7);
+ const targetDiscovery=limit-targetRelevant;
+ const chosen=[...relevant.slice(0,targetRelevant),...other.slice(0,targetDiscovery)];
+ const used=new Set(chosen.map(p=>String(p.id)));
+ // Fill unused positions if one pool is smaller than its target.
+ for(const product of [...relevant.slice(targetRelevant),...other.slice(targetDiscovery)]){
+  if(chosen.length>=limit)break;
+  if(!used.has(String(product.id))){chosen.push(product);used.add(String(product.id))}
+ }
+ return eurofyShuffle(chosen);
+}
 const eurofyOriginalSelectCategory=selectCategory;
 selectCategory=function(index){if(index>=0)eurofyRemember(categories[index],3);return eurofyOriginalSelectCategory(index)};
 const eurofyOriginalUpdateSearch=updateSearch;
 updateSearch=function(value){const query=String(value||'').trim().toLowerCase();if(query.length>=3){for(const category of categories){if(category!=='SALE'&&category.toLowerCase().includes(query))eurofyRemember(category,0.1)}}return eurofyOriginalUpdateSearch(value)};
-const originalGo=go;go=function(page,id){window.eurofyPage=page;window.eurofyPageId=id;if(page==='product'){const item=products.find(p=>String(p.id)===String(id));if(item)eurofyRemember(item.cat,2)}originalGo(page,id);if(page==='home'){const section=[...document.querySelectorAll('#app .section')].find(el=>el.textContent.includes('რჩეული პროდუქტები'));if(section){const grid=section.querySelector('.products');if(grid)grid.outerHTML=productCards(eurofyHomeProducts())}}applyLanguage()};
+const originalGo=go;go=function(page,id){window.eurofyPage=page;window.eurofyPageId=id;if(page==='product'){const item=products.find(p=>String(p.id)===String(id));if(item)eurofyRemember(item.cat,2)}originalGo(page,id);if(page==='home'){const section=[...document.querySelectorAll('#app .section')].find(el=>el.querySelector('.products'));if(section){const grid=section.querySelector('.products');if(grid)grid.outerHTML=productCards(eurofyHomeProducts())}}applyLanguage()};
 const originalRenderCatalog=renderCatalog;renderCatalog=function(){originalRenderCatalog();applyLanguage()};
 go('home');</script></body></html>
