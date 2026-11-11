@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS users (
  email text NOT NULL UNIQUE,
  password_hash text NOT NULL,
  full_name text NOT NULL DEFAULT '',
+ phone text NOT NULL DEFAULT '',
+ address text NOT NULL DEFAULT '',
  role text NOT NULL DEFAULT 'customer' CHECK (role IN ('customer','admin')),
  created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -78,3 +80,7 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status text NOT NULL DEFAULT
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_name text;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_phone text;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_address text;
+
+-- Migration for an existing EUROFY users table (safe to rerun).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone text NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS address text NOT NULL DEFAULT '';
