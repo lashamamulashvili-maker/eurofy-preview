@@ -145,8 +145,16 @@ app.post('/api/admin/pricing/recalculate',auth,admin,async(_req,res)=>{
  let c;try{c=await pool.connect();await c.query('BEGIN');const {rows}=await c.query('SELECT * FROM products WHERE supplier_price_gel_minor IS NOT NULL FOR UPDATE');for(const p of rows){const override=p.markup_override_percent===null?null:Number(p.markup_override_percent);const price=await calculate(c,p.supplier_price_gel_minor,p.category_id,override,p.fixed_price_gel_minor);const old=p.discount_verified&&p.supplier_original_gel_minor>p.supplier_price_gel_minor?await calculate(c,p.supplier_original_gel_minor,p.category_id,override,null):null;await c.query('UPDATE products SET price_gel_minor=$1,original_price_gel_minor=$2 WHERE id=$3',[price,old>price?old:null,p.id]);}await c.query('COMMIT');res.json({updated:rows.length});}catch{await c?.query('ROLLBACK').catch(()=>{});res.status(500).json({error:'Recalculation failed'});}finally{c?.release();}
 });
 app.get('/api/admin/products',auth,admin,async(_req,res)=>{
- try{const {rows}=await pool.query('SELECT id,category_id,title_ka,description_ka,price_gel_minor,original_price_gel_minor,supplier_price_gel_minor,supplier_original_gel_minor,markup_override_percent,fixed_price_gel_minor,discount_verified,image_url,sku,is_active,created_at FROM products ORDER BY created_at DESC LIMIT 200');res.json({products:rows});}
+ try{const {rows}=await pool.query('SELECT id,category_id,title_ka,description_ka,price_gel_minor,original_price_gel_minor,supplier_price_gel_minor,supplier_original_gel_minor,markup_override_percent,fixed_price_gel_minor,discount_verified,image_url,sku,is_active,supplier_name,supplier_product_url,supplier_stock_quantity,supplier_availability,supplier_last_synced_at,supplier_sync_source,created_at FROM products ORDER BY created_at DESC LIMIT 200');res.json({products:rows});}
  catch{res.status(500).json({error:'Unable to load products'});}
+});
+// Manual supplier metadata entry; automatic syncing requires a permitted supplier feed/API.
+app.patch('/api/admin/products/:id/supplier',auth,admin,async(req,res)=>{
+ if(!uuid(req.params.id))return res.status(400).json({error:'Invalid product id'});
+ const {name,url,stockQuantity,availability}=req.body||{};
+ if(typeof name!=='string'||name.length>180||typeof url!=='string'||url.length>1500||(url&&!/^https:\/\/[a-z0-9.-]+(?:[/:?#]|$)/i.test(url))||stockQuantity!==null&&(!Number.isInteger(stockQuantity)||stockQuantity<0||stockQuantity>100000000)||!['unknown','in_stock','out_of_stock'].includes(availability))return res.status(400).json({error:'Invalid supplier metadata'});
+ try{const {rows}=await pool.query('UPDATE products SET supplier_name=$2,supplier_product_url=$3,supplier_stock_quantity=$4,supplier_availability=$5,supplier_sync_source=$6,supplier_last_synced_at=NULL WHERE id=$1 RETURNING id,supplier_name,supplier_product_url,supplier_stock_quantity,supplier_availability',[req.params.id,name.trim()||null,url.trim()||null,stockQuantity,availability,'manual']);if(!rows.length)return res.status(404).json({error:'Product not found'});res.json({product:rows[0]});}
+ catch{res.status(500).json({error:'Unable to update supplier details; apply schema migration'});}
 });
 app.post('/api/admin/products',auth,admin,async(req,res)=>{
  const {title,description='',priceMinor,categoryId=null,imageUrl=null,sku=null,active=false,supplierPriceMinor=null,supplierOriginalMinor=null,markupOverride=null,fixedPriceMinor=null,discountVerified=false}=req.body||{};
