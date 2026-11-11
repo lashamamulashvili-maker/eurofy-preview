@@ -19,6 +19,19 @@ app.use('/api',(req,res,next)=>{
  if(req.method==='OPTIONS')return res.status(204).end();
  next();
 });
+// Official indicative EUR/GEL rate. Never silently use an old or invented rate.
+let fxCache=null;
+async function eurGelRate(){
+ if(fxCache&&Date.now()-fxCache.fetchedAt<6*60*60*1000)return fxCache;
+ const response=await fetch('https://nbg.gov.ge/gw/api/ct/monetarypolicy/currencies/en/json/?currencies=EUR',{signal:AbortSignal.timeout(8000),headers:{Accept:'application/json'}});
+ if(!response.ok)throw Error('NBG exchange rate unavailable');
+ const data=await response.json();const entry=data?.[0]?.currencies?.find(c=>c.code==='EUR');const rate=Number(entry?.rate)/Number(entry?.quantity||1);
+ if(!Number.isFinite(rate)||rate<0.5||rate>10||!/^\\d{4}-\\d{2}-\\d{2}$/.test(data?.[0]?.date||''))throw Error('Invalid NBG EUR rate');
+ const age=(Date.now()-Date.parse(data[0].date+'T00:00:00Z'))/86400000;
+ if(age>5||age< -2)throw Error('NBG rate is stale');
+ fxCache={rate,date:data[0].date,source:'National Bank of Georgia',fetchedAt:Date.now()};return fxCache;
+}
+app.get('/api/exchange-rate',async(_req,res)=>{try{const {rate,date,source}=await eurGelRate();res.json({base:'EUR',quote:'GEL',rate,date,source,indicative:true});}catch{res.status(503).json({error:'Official exchange rate unavailable'});}});
 const pool = process.env.DATABASE_URL ? new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSLMODE==='require'?{rejectUnauthorized:true}:undefined}) : null;
 app.get('/api/health',(_req,res)=>res.json({ok:true,databaseConfigured:Boolean(pool)}));
 app.get('/api/products',async(_req,res)=>{
@@ -155,19 +168,19 @@ app.post('/api/admin/supplier-sync',auth,admin,async(req,res)=>{
  if(typeof source!=='string'||source.length<2||source.length>120||!Array.isArray(items)||items.length<1||items.length>50)return res.status(400).json({error:'Invalid supplier feed batch (1-50 items)'});
  const clean=[];
  for(const item of items){
-  if(!item||!uuid(item.productId)||typeof item.supplierName!=='string'||!item.supplierName.trim()||item.supplierName.length>180||typeof item.productUrl!=='string'||item.productUrl.length>1500||!/^https:\/\/[a-z0-9.-]+(?:[/:?#]|$)/i.test(item.productUrl)||!['in_stock','out_of_stock','unknown'].includes(item.availability)||item.stockQuantity!==null&&(!Number.isInteger(item.stockQuantity)||item.stockQuantity<0||item.stockQuantity>100000000)||!minor(item.priceGelMinor)||item.originalPriceGelMinor!==null&&!minor(item.originalPriceGelMinor)||typeof item.discountVerified!=='boolean')return res.status(400).json({error:'Invalid supplier feed item'});
+  if(!item||!uuid(item.productId)||typeof item.supplierName!=='string'||!item.supplierName.trim()||item.supplierName.length>180||typeof item.productUrl!=='string'||item.productUrl.length>1500||!/^https:\/\/[a-z0-9.-]+(?:[/:?#]|$)/i.test(item.productUrl)||!['in_stock','out_of_stock','unknown'].includes(item.availability)||item.stockQuantity!==null&&(!Number.isInteger(item.stockQuantity)||item.stockQuantity<0||item.stockQuantity>100000000)||!(minor(item.priceGelMinor)||Number.isSafeInteger(item.priceEurMinor)&&item.priceEurMinor>=0&&item.priceEurMinor<=100000000)||item.originalPriceGelMinor!==null&&item.originalPriceGelMinor!==undefined&&!minor(item.originalPriceGelMinor)||item.originalPriceEurMinor!==null&&item.originalPriceEurMinor!==undefined&&!minor(item.originalPriceEurMinor)||typeof item.discountVerified!=='boolean')return res.status(400).json({error:'Invalid supplier feed item'});
   clean.push(item);
  }
  if(new Set(clean.map(x=>x.productId)).size!==clean.length)return res.status(400).json({error:'Duplicate product IDs'});
- let c;try{c=await pool.connect();await c.query('BEGIN');let updated=0;
+ let c;try{const needsFx=clean.some(x=>x.priceEurMinor!==undefined);const fx=needsFx?await eurGelRate():null;c=await pool.connect();await c.query('BEGIN');let updated=0;
   for(const item of clean){
    const old=(await c.query('SELECT id,category_id,markup_override_percent,fixed_price_gel_minor FROM products WHERE id=$1 FOR UPDATE',[item.productId])).rows[0];if(!old)throw Error('Product not found: '+item.productId);
    const override=old.markup_override_percent===null?null:Number(old.markup_override_percent);
-   const price=await calculate(c,item.priceGelMinor,old.category_id,override,old.fixed_price_gel_minor);
-   const original=item.discountVerified&&item.originalPriceGelMinor!==null&&item.originalPriceGelMinor>item.priceGelMinor?await calculate(c,item.originalPriceGelMinor,old.category_id,override,null):null;
-   await c.query('UPDATE products SET supplier_name=$2,supplier_product_url=$3,supplier_stock_quantity=$4,supplier_availability=$5,supplier_last_synced_at=now(),supplier_sync_source=$6,supplier_price_gel_minor=$7,supplier_original_gel_minor=$8,discount_verified=$9,price_gel_minor=$10,original_price_gel_minor=$11 WHERE id=$1',[item.productId,item.supplierName.trim(),item.productUrl,item.stockQuantity,item.availability,source,item.priceGelMinor,item.originalPriceGelMinor,item.discountVerified,price,original>price?original:null]);updated++;
+   const supplierCost=fx&&item.priceEurMinor!==undefined?Math.round(item.priceEurMinor*fx.rate):item.priceGelMinor;const supplierOriginal=fx&&item.priceEurMinor!==undefined&&item.originalPriceEurMinor!=null?Math.round(item.originalPriceEurMinor*fx.rate):item.originalPriceGelMinor??null;const price=await calculate(c,supplierCost,old.category_id,override,old.fixed_price_gel_minor);
+   const original=item.discountVerified&&supplierOriginal!==null&&supplierOriginal>supplierCost?await calculate(c,supplierOriginal,old.category_id,override,null):null;
+   await c.query('UPDATE products SET supplier_name=$2,supplier_product_url=$3,supplier_stock_quantity=$4,supplier_availability=$5,supplier_last_synced_at=now(),supplier_sync_source=$6,supplier_price_gel_minor=$7,supplier_original_gel_minor=$8,discount_verified=$9,price_gel_minor=$10,original_price_gel_minor=$11 WHERE id=$1',[item.productId,item.supplierName.trim(),item.productUrl,item.stockQuantity,item.availability,source,supplierCost,supplierOriginal,item.discountVerified,price,original>price?original:null]);updated++;
   }
-  await c.query('COMMIT');res.json({updated,source,notice:'Supplier data imported. No orders or payments were made.'});
+  await c.query('COMMIT');res.json({updated,source,exchangeRate:fx?{rate:fx.rate,date:fx.date}:null,notice:'Supplier data imported. No orders or payments were made.'});
  }catch(e){if(c)await c.query('ROLLBACK').catch(()=>{});res.status(400).json({error:e.message?.startsWith('Product not found')?e.message:'Supplier sync failed; verify schema and input'});}finally{if(c)c.release();}
 });
 // Manual supplier metadata entry; automatic syncing requires a permitted supplier feed/API.
