@@ -31,11 +31,11 @@ app.get('/api/products',async(_req,res)=>{
 const registerLimit=rateLimit({windowMs:60*60*1000,limit:5,standardHeaders:'draft-7',legacyHeaders:false});
 app.post('/api/register',registerLimit,async(req,res)=>{
  if(!pool)return res.status(503).json({error:'Database not configured'});
- const {email,password,fullName}=req.body||{};
- if(typeof email!=='string'||!/^\S+@\S+\.\S+$/.test(email)||email.length>254||typeof password!=='string'||password.length<12||password.length>128||typeof fullName!=='string'||fullName.length>120)return res.status(400).json({error:'Invalid registration fields'});
+ const {email,password,fullName,phone,address}=req.body||{};
+ if(typeof email!=='string'||!/^\S+@\S+\.\S+$/.test(email)||email.length>254||typeof password!=='string'||password.length<12||password.length>128||typeof fullName!=='string'||fullName.trim().length<2||fullName.length>120||typeof phone!=='string'||!/^\+?[0-9 ()-]{7,24}$/.test(phone.trim())||typeof address!=='string'||address.trim().length<5||address.length>300)return res.status(400).json({error:'Invalid registration fields'});
  try{
   const hash=await bcrypt.hash(password,12);
-  const {rows}=await pool.query('INSERT INTO users(email,password_hash,full_name) VALUES($1,$2,$3) RETURNING id,email,full_name',[email.trim().toLowerCase(),hash,fullName.trim()]);
+  const {rows}=await pool.query('INSERT INTO users(email,password_hash,full_name,phone,address) VALUES($1,$2,$3,$4,$5) RETURNING id,email,full_name',[email.trim().toLowerCase(),hash,fullName.trim(),phone.trim(),address.trim()]);
   res.status(201).json({user:rows[0]});
  }catch(e){res.status(e.code==='23505'?409:500).json({error:e.code==='23505'?'Email already registered':'Registration failed'});}
 });
