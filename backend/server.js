@@ -48,7 +48,7 @@ app.post('/api/register',registerLimit,async(req,res)=>{
  if(typeof email!=='string'||!/^\S+@\S+\.\S+$/.test(email)||email.length>254||typeof password!=='string'||password.length<12||password.length>128||typeof fullName!=='string'||fullName.trim().length<2||fullName.length>120||typeof phone!=='string'||!/^\+?[0-9 ()-]{7,24}$/.test(phone.trim())||typeof address!=='string'||address.trim().length<5||address.length>300||typeof city!=='string'||city.trim().length<2||city.length>120)return res.status(400).json({error:'Invalid registration fields'});
  try{
   const hash=await bcrypt.hash(password,12);
-  const {rows}=await pool.query('INSERT INTO users(email,password_hash,full_name,phone,address,city) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,email,full_name',[email.trim().toLowerCase(),hash,fullName.trim(),phone.trim(),address.trim(),city.trim()]);
+  const {rows}=await pool.query('INSERT INTO users(email,password_hash,full_name,phone,address,city) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,email,full_name,customer_code',[email.trim().toLowerCase(),hash,fullName.trim(),phone.trim(),address.trim(),city.trim()]);
   res.status(201).json({user:rows[0]});
  }catch(e){res.status(e.code==='23505'?409:500).json({error:e.code==='23505'?'Email already registered':'Registration failed'});}
 });
@@ -62,7 +62,7 @@ async function auth(req,res,next){
  const match=/^Bearer ([a-f0-9]{64})$/.exec(req.get('authorization')||'');
  if(!match)return res.status(401).json({error:'Authentication required'});
  try{
-  const {rows}=await pool.query('SELECT u.id,u.email,u.full_name,u.role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now()',[tokenHash(match[1])]);
+  const {rows}=await pool.query('SELECT u.id,u.email,u.full_name,u.role,u.customer_code FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now()',[tokenHash(match[1])]);
   if(!rows.length)return res.status(401).json({error:'Invalid or expired session'});
   req.user=rows[0];req.sessionHash=tokenHash(match[1]);next();
  }catch{res.status(500).json({error:'Authentication unavailable'});}
@@ -74,7 +74,7 @@ app.post('/api/login',loginLimit,async(req,res)=>{
  const {email,password}=req.body||{};
  if(!emailValid(email)||typeof password!=='string'||password.length<1||password.length>128)return res.status(400).json({error:'Invalid credentials'});
  try{
-  const {rows}=await pool.query('SELECT id,email,full_name,role,password_hash FROM users WHERE email=$1',[email.trim().toLowerCase()]);
+  const {rows}=await pool.query('SELECT id,email,full_name,role,customer_code,password_hash FROM users WHERE email=$1',[email.trim().toLowerCase()]);
   const ok=rows.length?await bcrypt.compare(password,rows[0].password_hash):await bcrypt.compare(password,'$2a$12$0OLvD1D8Kp85C3hjLcfZMeHL9iK2SmT2Q7pIO2Z2HJ5Wb9xznWw4O');
   if(!ok)return res.status(401).json({error:'Invalid credentials'});
   const token=randomBytes(32).toString('hex');
