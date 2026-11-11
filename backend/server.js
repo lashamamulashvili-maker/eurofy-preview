@@ -24,7 +24,7 @@ app.get('/api/health',(_req,res)=>res.json({ok:true,databaseConfigured:Boolean(p
 app.get('/api/products',async(_req,res)=>{
  if(!pool)return res.status(503).json({error:'Database not configured'});
  try{
-  const {rows}=await pool.query('SELECT p.id,p.title_ka,p.description_ka,p.price_gel_minor,p.image_url,c.name_ka AS category FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.is_active=true ORDER BY p.created_at DESC LIMIT 100');
+  const {rows}=await pool.query('SELECT p.id,p.title_ka,p.description_ka,p.price_gel_minor,p.original_price_gel_minor,p.image_url,c.name_ka AS category FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.is_active=true ORDER BY p.created_at DESC LIMIT 100');
   res.json({products:rows});
  }catch{res.status(500).json({error:'Unable to load products'});}
 });
@@ -107,30 +107,42 @@ app.get('/api/admin/orders',auth,admin,async(_req,res)=>{
 });
 const safeText=(v,max)=>typeof v==='string'&&v.trim().length>0&&v.length<=max;
 const uuid=v=>typeof v==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+const minor=v=>Number.isSafeInteger(v)&&v>=0&&v<=100000000;
+const percent=v=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=500;
+async function calculate(client,cost,categoryId,override,fixed){
+ if(fixed!==null)return fixed;
+ if(cost===null)return null;
+ const {rows}=await client.query('SELECT s.default_markup_percent,s.shipping_gel_minor,c.markup_percent FROM pricing_settings s LEFT JOIN category_markups c ON c.category_id=$1 WHERE s.id=1',[categoryId]);
+ if(!rows.length)throw Error('Pricing settings missing');
+ const p=override??Number(rows[0].markup_percent??rows[0].default_markup_percent);
+ const n=Math.round((cost+rows[0].shipping_gel_minor)*(1+p/100));
+ if(!minor(n))throw Error('Price out of range');return n;
+}
+app.get('/api/admin/pricing',auth,admin,async(_req,res)=>{try{const [s,c]=await Promise.all([pool.query('SELECT * FROM pricing_settings WHERE id=1'),pool.query('SELECT * FROM category_markups')]);res.json({settings:s.rows[0],categoryMarkups:c.rows});}catch{res.status(500).json({error:'Apply pricing migration first'});}});
+app.put('/api/admin/pricing',auth,admin,async(req,res)=>{
+ const {markup,shippingMinor,categories}=req.body||{};
+ if(!percent(markup)||!minor(shippingMinor)||!Array.isArray(categories)||categories.length>100||categories.some(x=>!uuid(x.id)||!percent(x.markup))||new Set(categories.map(x=>x.id)).size!==categories.length)return res.status(400).json({error:'Invalid pricing rules'});
+ let c;try{c=await pool.connect();await c.query('BEGIN');await c.query('UPDATE pricing_settings SET default_markup_percent=$1,shipping_gel_minor=$2 WHERE id=1',[markup,shippingMinor]);await c.query('DELETE FROM category_markups');for(const x of categories)await c.query('INSERT INTO category_markups(category_id,markup_percent) VALUES($1,$2)',[x.id,x.markup]);await c.query('COMMIT');res.json({saved:true});}catch{await c?.query('ROLLBACK').catch(()=>{});res.status(500).json({error:'Could not save rules'});}finally{c?.release();}
+});
+app.post('/api/admin/pricing/recalculate',auth,admin,async(_req,res)=>{
+ let c;try{c=await pool.connect();await c.query('BEGIN');const {rows}=await c.query('SELECT * FROM products WHERE supplier_price_gel_minor IS NOT NULL FOR UPDATE');for(const p of rows){const override=p.markup_override_percent===null?null:Number(p.markup_override_percent);const price=await calculate(c,p.supplier_price_gel_minor,p.category_id,override,p.fixed_price_gel_minor);const old=p.discount_verified&&p.supplier_original_gel_minor>p.supplier_price_gel_minor?await calculate(c,p.supplier_original_gel_minor,p.category_id,override,null):null;await c.query('UPDATE products SET price_gel_minor=$1,original_price_gel_minor=$2 WHERE id=$3',[price,old>price?old:null,p.id]);}await c.query('COMMIT');res.json({updated:rows.length});}catch{await c?.query('ROLLBACK').catch(()=>{});res.status(500).json({error:'Recalculation failed'});}finally{c?.release();}
+});
 app.get('/api/admin/products',auth,admin,async(_req,res)=>{
- try{const {rows}=await pool.query('SELECT id,category_id,title_ka,description_ka,price_gel_minor,image_url,sku,is_active,created_at FROM products ORDER BY created_at DESC LIMIT 200');res.json({products:rows});}
+ try{const {rows}=await pool.query('SELECT id,category_id,title_ka,description_ka,price_gel_minor,original_price_gel_minor,supplier_price_gel_minor,supplier_original_gel_minor,markup_override_percent,fixed_price_gel_minor,discount_verified,image_url,sku,is_active,created_at FROM products ORDER BY created_at DESC LIMIT 200');res.json({products:rows});}
  catch{res.status(500).json({error:'Unable to load products'});}
 });
 app.post('/api/admin/products',auth,admin,async(req,res)=>{
- const {title,description='',priceMinor,categoryId=null,imageUrl=null,sku=null,active=false}=req.body||{};
- if(!safeText(title,180)||typeof description!=='string'||description.length>5000||!Number.isSafeInteger(priceMinor)||priceMinor<0||priceMinor>100000000||categoryId!==null&&!uuid(categoryId)||imageUrl!==null&&(typeof imageUrl!=='string'||imageUrl.length>1000||!/^https:\/\//.test(imageUrl))||sku!==null&&!safeText(sku,80)||typeof active!=='boolean')return res.status(400).json({error:'Invalid product'});
- try{const {rows}=await pool.query('INSERT INTO products(title_ka,description_ka,price_gel_minor,category_id,image_url,sku,is_active) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',[title.trim(),description,priceMinor,categoryId,imageUrl,sku,active]);res.status(201).json({product:rows[0]});}
- catch(e){res.status(e.code==='23505'?409:500).json({error:'Product could not be created'});}
+ const {title,description='',priceMinor,categoryId=null,imageUrl=null,sku=null,active=false,supplierPriceMinor=null,supplierOriginalMinor=null,markupOverride=null,fixedPriceMinor=null,discountVerified=false}=req.body||{};
+ if(!safeText(title,180)||typeof description!=='string'||description.length>5000||!minor(priceMinor)||categoryId!==null&&!uuid(categoryId)||imageUrl!==null&&(typeof imageUrl!=='string'||imageUrl.length>1000||!/^https:\/\//.test(imageUrl))||sku!==null&&!safeText(sku,80)||typeof active!=='boolean'||supplierPriceMinor!==null&&!minor(supplierPriceMinor)||supplierOriginalMinor!==null&&!minor(supplierOriginalMinor)||markupOverride!==null&&!percent(markupOverride)||fixedPriceMinor!==null&&!minor(fixedPriceMinor)||typeof discountVerified!=='boolean')return res.status(400).json({error:'Invalid product'});
+ try{const price=(await calculate(pool,supplierPriceMinor,categoryId,markupOverride,fixedPriceMinor))??priceMinor;const original=discountVerified&&supplierOriginalMinor>supplierPriceMinor&&supplierPriceMinor!==null?await calculate(pool,supplierOriginalMinor,categoryId,markupOverride,null):null;const {rows}=await pool.query('INSERT INTO products(title_ka,description_ka,price_gel_minor,original_price_gel_minor,category_id,image_url,sku,is_active,supplier_price_gel_minor,supplier_original_gel_minor,markup_override_percent,fixed_price_gel_minor,discount_verified) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *',[title.trim(),description,price,original>price?original:null,categoryId,imageUrl,sku,active,supplierPriceMinor,supplierOriginalMinor,markupOverride,fixedPriceMinor,discountVerified]);res.status(201).json({product:rows[0]});}catch(e){res.status(e.code==='23505'?409:500).json({error:'Product creation failed; check pricing migration'});}
 });
 app.patch('/api/admin/products/:id',auth,admin,async(req,res)=>{
  if(!uuid(req.params.id))return res.status(400).json({error:'Invalid id'});
- const allowed={title_ka:'title',description_ka:'description',price_gel_minor:'priceMinor',category_id:'categoryId',image_url:'imageUrl',sku:'sku',is_active:'active'};
- const fields=[];const values=[];
- for(const [column,key] of Object.entries(allowed))if(Object.hasOwn(req.body||{},key)){
-  const v=req.body[key];
-  const valid=key==='title'?safeText(v,180):key==='description'?typeof v==='string'&&v.length<=5000:key==='priceMinor'?Number.isSafeInteger(v)&&v>=0&&v<=100000000:key==='categoryId'?v===null||uuid(v):key==='imageUrl'?v===null||typeof v==='string'&&v.length<=1000&&/^https:\/\//.test(v):key==='sku'?v===null||safeText(v,80):typeof v==='boolean';
-  if(!valid)return res.status(400).json({error:'Invalid '+key});
-  values.push(key==='title'?v.trim():v);fields.push(column+'=$'+values.length);
- }
- if(!fields.length)return res.status(400).json({error:'No fields'});
- values.push(req.params.id);
- try{const {rows}=await pool.query('UPDATE products SET '+fields.join(',')+' WHERE id=$'+values.length+' RETURNING *',values);if(!rows.length)return res.status(404).json({error:'Not found'});res.json({product:rows[0]});}
- catch{res.status(500).json({error:'Product could not be updated'});}
+ const map={title:'title_ka',description:'description_ka',priceMinor:'price_gel_minor',categoryId:'category_id',imageUrl:'image_url',sku:'sku',active:'is_active',supplierPriceMinor:'supplier_price_gel_minor',supplierOriginalMinor:'supplier_original_gel_minor',markupOverride:'markup_override_percent',fixedPriceMinor:'fixed_price_gel_minor',discountVerified:'discount_verified'};
+ const v=req.body||{},keys=Object.keys(v);if(!keys.length||keys.some(k=>!map[k]))return res.status(400).json({error:'Invalid fields'});
+ for(const k of keys){const x=v[k];if(!(k==='title'?safeText(x,180):k==='description'?typeof x==='string'&&x.length<=5000:k==='priceMinor'||k==='supplierPriceMinor'||k==='supplierOriginalMinor'||k==='fixedPriceMinor'?x===null&&k!=='priceMinor'||minor(x):k==='categoryId'?x===null||uuid(x):k==='imageUrl'?x===null||typeof x==='string'&&x.length<=1000&&/^https:\/\//.test(x):k==='sku'?x===null||safeText(x,80):k==='markupOverride'?x===null||percent(x):typeof x==='boolean'))return res.status(400).json({error:'Invalid '+k});}
+ let c;try{c=await pool.connect();await c.query('BEGIN');const existing=await c.query('SELECT * FROM products WHERE id=$1 FOR UPDATE',[req.params.id]);if(!existing.rows.length){await c.query('ROLLBACK');return res.status(404).json({error:'Not found'});}const fields=keys.map((k,i)=>map[k]+'=$'+(i+1));await c.query('UPDATE products SET '+fields.join(',')+' WHERE id=$'+(keys.length+1),[...keys.map(k=>v[k]),req.params.id]);const row=(await c.query('SELECT * FROM products WHERE id=$1',[req.params.id])).rows[0];if(keys.some(k=>['supplierPriceMinor','supplierOriginalMinor','markupOverride','fixedPriceMinor','categoryId','discountVerified'].includes(k))){const override=row.markup_override_percent===null?null:Number(row.markup_override_percent);const price=await calculate(c,row.supplier_price_gel_minor,row.category_id,override,row.fixed_price_gel_minor);if(price!==null){const old=row.discount_verified&&row.supplier_original_gel_minor>row.supplier_price_gel_minor?await calculate(c,row.supplier_original_gel_minor,row.category_id,override,null):null;await c.query('UPDATE products SET price_gel_minor=$1,original_price_gel_minor=$2 WHERE id=$3',[price,old>price?old:null,row.id]);}}const result=(await c.query('SELECT * FROM products WHERE id=$1',[req.params.id])).rows[0];await c.query('COMMIT');res.json({product:result});}catch{await c?.query('ROLLBACK').catch(()=>{});res.status(500).json({error:'Update failed'});}finally{c?.release();}
 });
 app.get('/api/categories',async(_req,res)=>{
  if(!pool)return res.status(503).json({error:'Database not configured'});
