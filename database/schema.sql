@@ -101,3 +101,10 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS original_price_gel_minor integer C
 ALTER TABLE users ADD COLUMN IF NOT EXISTS city text NOT NULL DEFAULT '';
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_city text;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_location text;
+
+-- Manual purchase and postal pickup workflow. No automatic payment or supplier purchase.
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('pending','confirmed','purchased','received_in_germany','in_transit','ready_for_pickup','delivered','cancelled'));
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS supplier_order_reference text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS parcel_tracking_number text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS fulfillment_note text NOT NULL DEFAULT '';
