@@ -23,7 +23,7 @@
 <label class="check"><input name="newOnly" type="checkbox" required> ვადასტურებ, რომ პროდუქტი ახალია და არა მეორადი *</label>
 <label class="check"><input name="reviewed" type="checkbox"> ფასი, ფოტო, მარაგი და მიწოდების შეზღუდვები შემოწმებულია</label>
 <div class="toolbar"><button type="submit">შენახვა მონახაზად</button><button type="reset" class="secondary">ველების გასუფთავება</button></div><p id="message" role="status"></p></form></section>
-<section><h2>მომზადებული პროდუქტები <span id="count">0</span></h2><p class="muted">ექსპორტი და იმპორტი მუშაობს მხოლოდ ლოკალურ JSON ფაილთან. ეს არ არის მომწოდებლის ავტომატური სინქრონიზაცია ან საიტზე გამოქვეყნება.</p>
+<section><h2>Supplier Import Center · KiK და სხვა მომწოდებლები</h2><p class="muted">მასობრივი იმპორტი ნებადართული CSV მონაცემთა ფაილიდან. თითოეული პროდუქტის ხელით დამატება საჭირო არ არის. KiK-ის პირდაპირი ავტომატური სინქრონიზაცია ჯერ არ არის ჩართული — ამისთვის საჭიროა ოფიციალური ან ნებადართული პროდუქტის მონაცემთა წყარო. იმპორტირებული პროდუქტები რჩება მონახაზებად, გამოქვეყნების გარეშე.</p><div class="toolbar"><button type="button" id="csvTemplate">CSV შაბლონის ჩამოტვირთვა</button><button type="button" id="csvImport" class="secondary">CSV ფაილის იმპორტი</button><input id="csvFile" type="file" accept=".csv,text/csv" hidden></div><p id="csvStatus" role="status"></p><small>სვეტები: sku,title,category,brand,cost,currency,priceGel,supplier,supplierUrl,imageUrl,description,sizes,colors. ახალი ნივთის სტატუსი უნდა დადასტურდეს იმპორტამდე; მონახაზები ავტომატურად არ ქვეყნდება.</small></section><section><h2>მომზადებული პროდუქტები <span id="count">0</span></h2><p class="muted">ექსპორტი და იმპორტი მუშაობს მხოლოდ ლოკალურ JSON ფაილთან. ეს არ არის მომწოდებლის ავტომატური სინქრონიზაცია ან საიტზე გამოქვეყნება.</p>
 <div class="toolbar"><button id="export" type="button">JSON ექსპორტი</button><button id="importBtn" class="secondary" type="button">JSON იმპორტი</button><input id="file" type="file" accept=".json,application/json" hidden><button id="clear" class="secondary" type="button">ყველას წაშლა</button></div><div id="items"></div></section></main>
 <script>
 'use strict';
@@ -41,5 +41,45 @@ $('export').onclick=()=>{const blob=new Blob([JSON.stringify({format:'EUROFY_PRO
 $('importBtn').onclick=()=>$('file').click();
 $('file').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;try{if(file.size>1024*1024)throw Error('ფაილი 1 MB-ზე დიდია');const obj=JSON.parse(await file.text());if(obj.format!=='EUROFY_PRODUCT_DRAFTS_V1'||!Array.isArray(obj.items)||obj.items.length>1000||!obj.items.every(validate))throw Error('არასწორი EUROFY JSON ფორმატი');const all=[...drafts];for(const item of obj.items){const i=all.findIndex(x=>x.sku.toLowerCase()===item.sku.toLowerCase());if(i>=0)all[i]=item;else all.push(item)}drafts=all;if(store()){render();message.textContent='იმპორტირებულია '+obj.items.length+' ჩანაწერი'}}catch(err){message.textContent='იმპორტის შეცდომა: '+err.message}e.target.value=''};
 $('clear').onclick=()=>{if(confirm('წაიშალოს ყველა ლოკალური მონახაზი?')){drafts=[];store();render()}};
+
+function csvRows(text){
+ const rows=[];let row=[],field='',quoted=false;
+ for(let i=0;i<text.length;i++){const ch=text[i];
+  if(quoted){if(ch==='"'&&text[i+1]==='"'){field+='"';i++}else if(ch==='"')quoted=false;else field+=ch}
+  else if(ch==='"'){if(field!=='')throw Error('CSV ბრჭყალების შეცდომა');quoted=true}
+  else if(ch===','){row.push(field);field=''}
+  else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&text[i+1]==='\n')i++;row.push(field);if(row.some(x=>x.trim()))rows.push(row);row=[];field=''}
+  else field+=ch;
+ }
+ if(quoted)throw Error('დაუხურავი CSV ბრჭყალი');
+ row.push(field);if(row.some(x=>x.trim()))rows.push(row);return rows;
+}
+function downloadText(name,content,type){const url=URL.createObjectURL(new Blob([content],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+$('csvTemplate').onclick=()=>downloadText('eurofy-supplier-template.csv','sku,title,category,brand,cost,currency,priceGel,supplier,supplierUrl,imageUrl,description,sizes,colors\nEUF-0001,Example product,ტანსაცმელი,Example,5.99,EUR,29.99,KiK,https://www.kik.de/,,,S|M,black|white\n','text/csv;charset=utf-8');
+$('csvImport').onclick=()=>$('csvFile').click();
+$('csvFile').onchange=async e=>{
+ const file=e.target.files?.[0];if(!file)return;const status=$('csvStatus');
+ try{
+  if(file.size>2*1024*1024)throw Error('ფაილი 2 MB-ზე დიდია');
+  const rows=csvRows((await file.text()).replace(/^\uFEFF/,''));
+  if(rows.length<2||rows.length>1001)throw Error('CSV უნდა შეიცავდეს 1-1000 პროდუქტს');
+  const header=rows.shift().map(x=>x.trim());
+  const required=['sku','title','category','cost','currency','priceGel'];
+  if(required.some(k=>!header.includes(k))||new Set(header).size!==header.length)throw Error('CSV სვეტები არასწორია');
+  const incoming=rows.map((values,i)=>{
+   if(values.length!==header.length)throw Error('სტრიქონი '+(i+2)+': სვეტების რაოდენობა არ ემთხვევა');
+   const d=Object.fromEntries(header.map((k,j)=>[k,values[j].trim()]));
+   const p={sku:d.sku||'',title:d.title||'',category:d.category||'',brand:d.brand||'',supplier:d.supplier||'',supplierUrl:d.supplierUrl||'',cost:Number(d.cost),currency:d.currency||'',priceGel:Number(d.priceGel),availability:'unknown',sizes:d.sizes||'',colors:d.colors||'',imageUrl:d.imageUrl||'',imageUrl2:'',description:d.description||'',newOnly:true,reviewed:false};
+   if(!validate(p))throw Error('სტრიქონი '+(i+2)+': არასწორი ფასი, ვალუტა, SKU ან HTTPS ბმული');
+   return p;
+  });
+  const seen=new Set();for(const p of incoming){const key=p.sku.toLowerCase();if(seen.has(key))throw Error('განმეორებული SKU: '+p.sku);seen.add(key)}
+  if(!confirm('იმპორტი: '+incoming.length+' მონახაზი. დაადასტურე, რომ ყველა პროდუქტი ახალია და მონაცემთა ფაილის გამოყენების უფლება გაქვს. არსებული SKU ჩანაცვლდება.'))return;
+  const merged=[...drafts];for(const p of incoming){const i=merged.findIndex(x=>x.sku.toLowerCase()===p.sku.toLowerCase());if(i>=0)merged[i]=p;else merged.push(p)}
+  if(merged.length>3000)throw Error('ლოკალური მონახაზების ლიმიტი: 3000');
+  drafts=merged;if(store()){render();status.textContent='დამატებულია/განახლებულია '+incoming.length+' მონახაზი. მაღაზიაში ჯერ არ გამოქვეყნებულა.'}
+ }catch(err){status.textContent='იმპორტის შეცდომა: '+err.message}
+ finally{e.target.value=''}
+};
 render();
 </script></body></html>
