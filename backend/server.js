@@ -15,7 +15,7 @@ const allowedOrigins=new Set((process.env.ALLOWED_ORIGINS||'').split(',').map(x=
 app.use('/api',(req,res,next)=>{
  const origin=req.get('origin');
  if(origin&&!allowedOrigins.has(origin))return res.status(403).json({error:'Origin not allowed'});
- if(origin){res.set('Access-Control-Allow-Origin',origin);res.set('Vary','Origin');res.set('Access-Control-Allow-Methods','GET,POST,PATCH,OPTIONS');res.set('Access-Control-Allow-Headers','Authorization,Content-Type');}
+ if(origin){res.set('Access-Control-Allow-Origin',origin);res.set('Vary','Origin');res.set('Access-Control-Allow-Methods','GET,POST,PATCH,PUT,OPTIONS');res.set('Access-Control-Allow-Headers','Authorization,Content-Type');}
  if(req.method==='OPTIONS')return res.status(204).end();
  next();
 });
@@ -147,6 +147,28 @@ app.post('/api/admin/pricing/recalculate',auth,admin,async(_req,res)=>{
 app.get('/api/admin/products',auth,admin,async(_req,res)=>{
  try{const {rows}=await pool.query('SELECT id,category_id,title_ka,description_ka,price_gel_minor,original_price_gel_minor,supplier_price_gel_minor,supplier_original_gel_minor,markup_override_percent,fixed_price_gel_minor,discount_verified,image_url,sku,is_active,supplier_name,supplier_product_url,supplier_stock_quantity,supplier_availability,supplier_last_synced_at,supplier_sync_source,created_at FROM products ORDER BY created_at DESC LIMIT 200');res.json({products:rows});}
  catch{res.status(500).json({error:'Unable to load products'});}
+});
+// Import verified snapshots from an authorized supplier feed. No scraping, checkout or payment.
+// Prices are supplied in GEL minor units; EUR conversion must happen in a trusted upstream adapter.
+app.post('/api/admin/supplier-sync',auth,admin,async(req,res)=>{
+ const {source,items}=req.body||{};
+ if(typeof source!=='string'||source.length<2||source.length>120||!Array.isArray(items)||items.length<1||items.length>50)return res.status(400).json({error:'Invalid supplier feed batch (1-50 items)'});
+ const clean=[];
+ for(const item of items){
+  if(!item||!uuid(item.productId)||typeof item.supplierName!=='string'||!item.supplierName.trim()||item.supplierName.length>180||typeof item.productUrl!=='string'||item.productUrl.length>1500||!/^https:\/\/[a-z0-9.-]+(?:[/:?#]|$)/i.test(item.productUrl)||!['in_stock','out_of_stock','unknown'].includes(item.availability)||item.stockQuantity!==null&&(!Number.isInteger(item.stockQuantity)||item.stockQuantity<0||item.stockQuantity>100000000)||!minor(item.priceGelMinor)||item.originalPriceGelMinor!==null&&!minor(item.originalPriceGelMinor)||typeof item.discountVerified!=='boolean')return res.status(400).json({error:'Invalid supplier feed item'});
+  clean.push(item);
+ }
+ if(new Set(clean.map(x=>x.productId)).size!==clean.length)return res.status(400).json({error:'Duplicate product IDs'});
+ let c;try{c=await pool.connect();await c.query('BEGIN');let updated=0;
+  for(const item of clean){
+   const old=(await c.query('SELECT id,category_id,markup_override_percent,fixed_price_gel_minor FROM products WHERE id=$1 FOR UPDATE',[item.productId])).rows[0];if(!old)throw Error('Product not found: '+item.productId);
+   const override=old.markup_override_percent===null?null:Number(old.markup_override_percent);
+   const price=await calculate(c,item.priceGelMinor,old.category_id,override,old.fixed_price_gel_minor);
+   const original=item.discountVerified&&item.originalPriceGelMinor!==null&&item.originalPriceGelMinor>item.priceGelMinor?await calculate(c,item.originalPriceGelMinor,old.category_id,override,null):null;
+   await c.query('UPDATE products SET supplier_name=$2,supplier_product_url=$3,supplier_stock_quantity=$4,supplier_availability=$5,supplier_last_synced_at=now(),supplier_sync_source=$6,supplier_price_gel_minor=$7,supplier_original_gel_minor=$8,discount_verified=$9,price_gel_minor=$10,original_price_gel_minor=$11 WHERE id=$1',[item.productId,item.supplierName.trim(),item.productUrl,item.stockQuantity,item.availability,source,item.priceGelMinor,item.originalPriceGelMinor,item.discountVerified,price,original>price?original:null]);updated++;
+  }
+  await c.query('COMMIT');res.json({updated,source,notice:'Supplier data imported. No orders or payments were made.'});
+ }catch(e){if(c)await c.query('ROLLBACK').catch(()=>{});res.status(400).json({error:e.message?.startsWith('Product not found')?e.message:'Supplier sync failed; verify schema and input'});}finally{if(c)c.release();}
 });
 // Manual supplier metadata entry; automatic syncing requires a permitted supplier feed/API.
 app.patch('/api/admin/products/:id/supplier',auth,admin,async(req,res)=>{
