@@ -6,6 +6,9 @@ import bcrypt from 'bcryptjs';
 import {randomBytes,createHash} from 'node:crypto';
 
 const app = express();
+// Render terminates HTTPS at its reverse proxy. Trust only the nearest proxy hop
+// so express-rate-limit can resolve the client IP from X-Forwarded-For.
+app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.use(helmet());
 app.use(express.json({limit:'32kb'}));
