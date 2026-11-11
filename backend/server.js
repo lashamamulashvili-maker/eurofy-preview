@@ -102,7 +102,7 @@ app.post('/api/orders',auth,async(req,res)=>{
  finally{if(client)client.release();}
 });
 app.get('/api/admin/orders',auth,admin,async(_req,res)=>{
- try{const {rows}=await pool.query('SELECT o.id,o.order_number,o.status,o.payment_status,o.total_gel_minor,o.created_at,o.pickup_city,o.pickup_location,o.supplier_order_reference,o.parcel_tracking_number,o.fulfillment_note,u.email AS customer_email FROM orders o LEFT JOIN users u ON u.id=o.user_id ORDER BY o.created_at DESC LIMIT 100');res.json({orders:rows});}
+ try{const {rows}=await pool.query('SELECT o.id,o.order_number,o.status,o.payment_status,o.total_gel_minor,o.created_at,o.pickup_city,o.pickup_location,o.supplier_order_reference,o.parcel_tracking_number,o.fulfillment_note,u.email AS customer_email FROM orders o LEFT JOIN users u ON u.id=o.user_id ORDER BY o.created_at DESC LIMIT 100');const ids=rows.map(o=>o.id);const itemRows=ids.length?(await pool.query('SELECT oi.order_id,oi.product_title_snapshot,oi.quantity,p.supplier_name,p.supplier_product_url,p.supplier_price_gel_minor,p.supplier_stock_quantity,p.supplier_availability,p.supplier_last_synced_at FROM order_items oi LEFT JOIN products p ON p.id=oi.product_id WHERE oi.order_id=ANY($1::uuid[]) ORDER BY oi.id',[ids])).rows:[];const grouped=new Map();for(const item of itemRows){if(!grouped.has(item.order_id))grouped.set(item.order_id,[]);grouped.get(item.order_id).push(item);}res.json({orders:rows.map(o=>({...o,items:grouped.get(o.id)||[]}))});}
  catch{res.status(500).json({error:'Unable to load orders; apply schema migration'});}
 });
 const fulfillmentStages=['pending','confirmed','purchased','received_in_germany','in_transit','ready_for_pickup','delivered'];
