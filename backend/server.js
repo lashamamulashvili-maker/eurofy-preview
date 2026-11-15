@@ -91,6 +91,16 @@ app.post('/api/login',loginLimit,async(req,res)=>{
  }catch{res.status(500).json({error:'Login unavailable'});}
 });
 app.get('/api/me',auth,(req,res)=>res.set('Cache-Control','no-store').json({user:req.user}));
+app.get('/api/profile',auth,async(req,res)=>{
+ try{const {rows}=await pool.query('SELECT id,email,full_name,phone,address,city,customer_code FROM users WHERE id=$1',[req.user.id]);if(!rows.length)return res.status(404).json({error:'Profile not found'});res.set('Cache-Control','no-store').json({profile:rows[0]});}
+ catch{res.status(500).json({error:'Unable to load profile'});}
+});
+app.patch('/api/profile',auth,async(req,res)=>{
+ const {fullName,phone,address,city}=req.body||{};
+ if(typeof fullName!=='string'||fullName.trim().length<2||fullName.length>120||typeof phone!=='string'||!/^[+0-9 ()-]{7,24}$/.test(phone.trim())||typeof address!=='string'||address.trim().length<5||address.length>300||typeof city!=='string'||city.trim().length<2||city.length>120)return res.status(400).json({error:'Invalid profile fields'});
+ try{const {rows}=await pool.query('UPDATE users SET full_name=$2,phone=$3,address=$4,city=$5 WHERE id=$1 RETURNING id,email,full_name,phone,address,city,customer_code',[req.user.id,fullName.trim(),phone.trim(),address.trim(),city.trim()]);res.set('Cache-Control','no-store').json({profile:rows[0]});}
+ catch{res.status(500).json({error:'Unable to update profile'});}
+});
 app.post('/api/logout',auth,async(req,res)=>{
  try{await pool.query('DELETE FROM sessions WHERE token_hash=$1',[req.sessionHash]);res.status(204).end();}
  catch{res.status(500).json({error:'Logout failed'});}
