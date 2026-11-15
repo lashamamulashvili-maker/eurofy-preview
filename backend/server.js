@@ -110,6 +110,46 @@ app.get('/api/my-orders',auth,async(req,res)=>{
  catch{res.status(500).json({error:'Unable to load orders'});}
 });
 // Orders remain unpaid until a separately integrated payment provider verifies payment.
+
+// Optional transactional order alerts. The API key and sender must stay server-side.
+// Missing configuration never blocks order creation or exposes customer data.
+async function notifyOwnerOfOrder(order,customer,delivery,items){
+ const apiKey=process.env.RESEND_API_KEY;
+ const to=process.env.ORDER_NOTIFICATION_EMAIL;
+ const from=process.env.ORDER_NOTIFICATION_FROM;
+ if(!apiKey||!to||!from)return {sent:false,reason:'not_configured'};
+ const validEmail=x=>typeof x==='string'&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x);
+ if(!validEmail(to)||!validEmail(from))return {sent:false,reason:'invalid_configuration'};
+ const safe=x=>String(x??'').replace(/[\u0000-\u001f\u007f]/g,' ').slice(0,1500);
+ const lines=[
+  'EUROFY — ახალი გადაუხდელი შეკვეთის მოთხოვნა',
+  'შეკვეთა: '+safe(order.order_number),
+  'სტატუსი: გადაუხდელი; არ არის შეძენილი ან გაგზავნილი',
+  'მომხმარებლის ელფოსტა: '+safe(customer),
+  'მიმღები: '+safe(delivery.name),
+  'ტელეფონი: '+safe(delivery.phone),
+  'მისამართი: '+safe(delivery.address),
+  'ჯამი: '+(order.total_gel_minor/100).toFixed(2)+' GEL',
+  '',
+  ...items.flatMap((item,i)=>[
+   (i+1)+'. '+safe(item.title_ka)+' × '+item.quantity,
+   'მომწოდებელი: '+safe(item.supplier_name||'არ არის მითითებული'),
+   'პროდუქტის ბმული: '+safe(item.supplier_product_url||'არ არის მითითებული'),
+   'ფასი: '+(item.price_gel_minor/100).toFixed(2)+' GEL',
+   ''
+  ])
+ ];
+ try{
+  const response=await fetch('https://api.resend.com/emails',{
+   method:'POST',
+   headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json'},
+   body:JSON.stringify({from,to:[to],subject:'EUROFY შეკვეთა '+safe(order.order_number),text:lines.join('\n')}),
+   signal:AbortSignal.timeout(8000)
+  });
+  if(!response.ok){console.error('Order alert provider returned',response.status);return {sent:false,reason:'provider_error'};}
+  return {sent:true};
+ }catch(e){console.error('Order alert delivery failed',e.name||'error');return {sent:false,reason:'network_error'};}
+}
 app.post('/api/orders',auth,async(req,res)=>{
  const {items,deliveryName,deliveryPhone,deliveryAddress}=req.body||{};
  if(!Array.isArray(items)||items.length<1||items.length>40||items.some(i=>!i||typeof i.productId!=='string'||!/^[0-9a-f-]{36}$/i.test(i.productId)||!Number.isInteger(i.quantity)||i.quantity<1||i.quantity>20)||typeof deliveryName!=='string'||deliveryName.trim().length<2||deliveryName.length>120||typeof deliveryPhone!=='string'||deliveryPhone.length<5||deliveryPhone.length>40||typeof deliveryAddress!=='string'||deliveryAddress.trim().length<8||deliveryAddress.length>500)return res.status(400).json({error:'Invalid order fields'});
@@ -127,7 +167,17 @@ app.post('/api/orders',auth,async(req,res)=>{
   const {rows:created}=await client.query('INSERT INTO orders(order_number,user_id,total_gel_minor,delivery_name,delivery_phone,delivery_address) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,order_number,status,payment_status,total_gel_minor',[number,req.user.id,total,deliveryName.trim(),deliveryPhone.trim(),deliveryAddress.trim()]);
   for(const i of items){const p=byId.get(i.productId);await client.query('INSERT INTO order_items(order_id,product_id,product_title_snapshot,unit_price_gel_minor,quantity) VALUES($1,$2,$3,$4,$5)',[created[0].id,p.id,p.title_ka,p.price_gel_minor,i.quantity]);}
   await client.query('COMMIT');
-  res.status(201).json({order:created[0],notice:'Order is unpaid. No purchase or shipment has been initiated.'});
+  // An email is a secondary notification: order persistence succeeds independently.
+  // Do not send alerts from the browser or leak provider credentials to clients.
+  let notification={sent:false,reason:'not_configured'};
+  try{
+   const {rows:details}=await pool.query(
+    'SELECT p.title_ka,p.price_gel_minor,p.supplier_name,p.supplier_product_url,oi.quantity FROM order_items oi JOIN products p ON p.id=oi.product_id WHERE oi.order_id=$1 ORDER BY oi.id',
+    [created[0].id]
+   );
+   notification=await notifyOwnerOfOrder(created[0],req.user.email,{name:deliveryName,phone:deliveryPhone,address:deliveryAddress},details);
+  }catch(e){console.error('Order notification lookup failed',e.code||'error');notification={sent:false,reason:'lookup_error'};}
+  res.status(201).json({order:created[0],notificationStatus:notification.sent?'sent':'pending',notice:'Order is unpaid. No purchase or shipment has been initiated.'});
  }catch{if(client)await client.query('ROLLBACK').catch(()=>{});res.status(500).json({error:'Order could not be created'});}
  finally{if(client)client.release();}
 });
