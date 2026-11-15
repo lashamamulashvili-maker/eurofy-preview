@@ -103,7 +103,7 @@ app.get('/api/my-orders',auth,async(req,res)=>{
 // Orders remain unpaid until a separately integrated payment provider verifies payment.
 app.post('/api/orders',auth,async(req,res)=>{
  const {items,deliveryName,deliveryPhone,deliveryAddress}=req.body||{};
- if(!Array.isArray(items)||items.length<1||items.length>40||items.some(i=>!i||typeof i.productId!=='string'||!/^[0-9a-f-]{36}$/i.test(i.productId)||!Number.isInteger(i.quantity)||i.quantity<1||i.quantity>20)||typeof deliveryName!=='string'||deliveryName.trim().length<2||deliveryName.length>120||typeof deliveryPhone!=='string'||deliveryPhone.length<5||deliveryPhone.length>40||typeof deliveryAddress!=='string'||deliveryAddress.trim().length<8||deliveryAddress.length>500)return res.status(400).json({error:'Invalid order fields'});
+ if(!Array.isArray(items)||items.length<1||items.length>40||items.some(i=>!i||!uuid(i.productId)||!Number.isInteger(i.quantity)||i.quantity<1||i.quantity>20)||typeof deliveryName!=='string'||deliveryName.trim().length<2||deliveryName.length>120||typeof deliveryPhone!=='string'||deliveryPhone.length<5||deliveryPhone.length>40||typeof deliveryAddress!=='string'||deliveryAddress.trim().length<8||deliveryAddress.length>500)return res.status(400).json({error:'Invalid order fields'});
  const ids=items.map(i=>i.productId);if(new Set(ids).size!==ids.length)return res.status(400).json({error:'Duplicate products'});
  let client;
  try{
@@ -131,15 +131,21 @@ app.patch('/api/admin/orders/:id/fulfillment',auth,admin,async(req,res)=>{
  const {status,supplierOrderReference,trackingNumber,note}=req.body||{};
  if(!uuid(req.params.id)||!fulfillmentStages.includes(status)&&status!=='cancelled'||[supplierOrderReference,trackingNumber,note].some(v=>v!==undefined&&(typeof v!=='string'||v.length>500)))return res.status(400).json({error:'Invalid fulfillment fields'});
  try{
-  const {rows}=await pool.query('SELECT status,payment_status FROM orders WHERE id=$1',[req.params.id]);
-  if(!rows.length)return res.status(404).json({error:'Order not found'});
-  const previous=rows[0].status;
-  if(previous==='cancelled'||previous==='delivered')return res.status(409).json({error:'Order is closed'});
-  const allowed=status==='cancelled'||status===previous||fulfillmentStages.indexOf(status)===fulfillmentStages.indexOf(previous)+1;
-  if(!allowed)return res.status(409).json({error:'Complete fulfillment stages in order'});
-  if(status==='purchased'&&rows[0].payment_status!=='paid')return res.status(409).json({error:'Payment must be verified before purchasing from supplier'});
-  const updated=await pool.query('UPDATE orders SET status=$2,supplier_order_reference=COALESCE($3,supplier_order_reference),parcel_tracking_number=COALESCE($4,parcel_tracking_number),fulfillment_note=COALESCE($5,fulfillment_note) WHERE id=$1 RETURNING id,order_number,status,payment_status',[req.params.id,status,supplierOrderReference?.trim(),trackingNumber?.trim(),note?.trim()]);
-  res.json({order:updated.rows[0]});
+  const client=await pool.connect();
+  try{
+   await client.query('BEGIN');
+   const {rows}=await client.query('SELECT status,payment_status FROM orders WHERE id=$1 FOR UPDATE',[req.params.id]);
+   if(!rows.length){await client.query('ROLLBACK');return res.status(404).json({error:'Order not found'});}
+   const previous=rows[0].status;
+   if(previous==='cancelled'||previous==='delivered'){await client.query('ROLLBACK');return res.status(409).json({error:'Order is closed'});}
+   const allowed=status==='cancelled'||status===previous||fulfillmentStages.indexOf(status)===fulfillmentStages.indexOf(previous)+1;
+   if(!allowed){await client.query('ROLLBACK');return res.status(409).json({error:'Complete fulfillment stages in order'});}
+   if(status==='purchased'&&rows[0].payment_status!=='paid'){await client.query('ROLLBACK');return res.status(409).json({error:'Payment must be verified before purchasing from supplier'});}
+   const updated=await client.query('UPDATE orders SET status=$2,supplier_order_reference=COALESCE($3,supplier_order_reference),parcel_tracking_number=COALESCE($4,parcel_tracking_number),fulfillment_note=COALESCE($5,fulfillment_note) WHERE id=$1 RETURNING id,order_number,status,payment_status',[req.params.id,status,supplierOrderReference?.trim(),trackingNumber?.trim(),note?.trim()]);
+   await client.query('COMMIT');
+   res.json({order:updated.rows[0]});
+  }catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}
+  finally{client.release();}
  }catch{res.status(500).json({error:'Unable to update fulfillment'});}
 });
 const safeText=(v,max)=>typeof v==='string'&&v.trim().length>0&&v.length<=max;
