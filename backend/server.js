@@ -29,7 +29,7 @@ async function eurGelRate(){
  const response=await fetch('https://nbg.gov.ge/gw/api/ct/monetarypolicy/currencies/en/json/?currencies=EUR',{signal:AbortSignal.timeout(8000),headers:{Accept:'application/json'}});
  if(!response.ok)throw Error('NBG exchange rate unavailable');
  const data=await response.json();const entry=data?.[0]?.currencies?.find(c=>c.code==='EUR');const rate=Number(entry?.rate)/Number(entry?.quantity||1);
- if(!Number.isFinite(rate)||rate<0.5||rate>10||!/^\\d{4}-\\d{2}-\\d{2}$/.test(data?.[0]?.date||''))throw Error('Invalid NBG EUR rate');
+ if(!Number.isFinite(rate)||rate<0.5||rate>10||!/^\d{4}-\d{2}-\d{2}$/.test(data?.[0]?.date||''))throw Error('Invalid NBG EUR rate');
  const age=(Date.now()-Date.parse(data[0].date+'T00:00:00Z'))/86400000;
  if(age>5||age< -2)throw Error('NBG rate is stale');
  fxCache={rate,date:data[0].date,source:'National Bank of Georgia',fetchedAt:Date.now()};return fxCache;
