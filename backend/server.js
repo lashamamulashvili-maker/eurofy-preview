@@ -295,9 +295,33 @@ app.patch('/api/admin/products/:id',auth,admin,async(req,res)=>{
 });
 app.get('/api/categories',async(_req,res)=>{
  if(!pool)return res.status(503).json({error:'Database not configured'});
- try{const {rows}=await pool.query('SELECT id,name_ka,slug FROM categories ORDER BY name_ka');res.json({categories:rows});}
+ try{const {rows}=await pool.query(`SELECT c.id,c.name_ka,c.name_en,c.name_uk,c.slug,c.description_ka,c.description_en,c.description_uk,c.display_order,c.is_published,
+   (SELECT count(*)::int FROM products p WHERE p.category_id=c.id AND p.is_active=true AND p.publication_status='published') AS product_count,
+   (SELECT count(*)::int FROM eurofy_subcategories s WHERE s.category_id=c.id AND s.is_published=true) AS subcategory_count
+   FROM categories c WHERE c.is_published=true ORDER BY c.display_order,c.slug`);res.json({categories:rows});}
  catch{res.status(500).json({error:'Unable to load categories'});}
 });
+app.get('/api/categories/:slug/subcategories',async(req,res)=>{
+ if(!/^[a-z0-9-]{1,100}$/.test(req.params.slug))return res.status(400).json({error:'Invalid category'});
+ try{const {rows}=await pool.query(`SELECT s.id,s.slug,s.name_ka,s.name_en,s.name_uk,s.description_ka,s.description_en,s.description_uk,s.display_order,
+ (SELECT count(*)::int FROM products p WHERE p.subcategory_id=s.id AND p.is_active=true AND p.publication_status='published') AS product_count
+ FROM eurofy_subcategories s JOIN categories c ON c.id=s.category_id WHERE c.slug=$1 AND c.is_published=true AND s.is_published=true ORDER BY s.display_order,s.slug`,[req.params.slug]);res.json({subcategories:rows});}
+ catch{res.status(500).json({error:'Unable to load subcategories'});}
+});
+app.get('/api/admin/categories',auth,admin,async(_req,res)=>{
+ try{const {rows}=await pool.query(`SELECT c.*,(SELECT count(*)::int FROM products p WHERE p.category_id=c.id) product_count FROM categories c ORDER BY c.display_order,c.slug`);res.json({categories:rows});}
+ catch{res.status(500).json({error:'Unable to load categories'});}
+});
+app.patch('/api/admin/categories/:id',auth,admin,async(req,res)=>{
+ if(!uuid(req.params.id))return res.status(400).json({error:'Invalid category id'});
+ const fields={nameKa:'name_ka',nameEn:'name_en',nameUk:'name_uk',descriptionKa:'description_ka',descriptionEn:'description_en',descriptionUk:'description_uk',displayOrder:'display_order',published:'is_published'};const entries=Object.entries(req.body||{});
+ if(!entries.length||entries.some(([k])=>!fields[k]))return res.status(400).json({error:'Invalid category fields'});
+ for(const [k,v] of entries){if(k==='published'){if(typeof v!=='boolean')return res.status(400).json({error:'Invalid category visibility'});}else if(k==='displayOrder'){if(!Number.isInteger(v)||v<0||v>100000)return res.status(400).json({error:'Invalid display order'});}else if(typeof v!=='string'||v.length>2000)return res.status(400).json({error:'Invalid category translation'});}
+ const sets=entries.map(([k],i)=>`${fields[k]}=$${i+2}`).join(',');try{const {rows}=await pool.query(`UPDATE categories SET ${sets} WHERE id=$1 RETURNING *`,[req.params.id,...entries.map(x=>x[1])]);if(!rows.length)return res.status(404).json({error:'Category not found'});res.json({category:rows[0]});}catch{res.status(500).json({error:'Category could not be updated'});}
+});
+app.get('/api/admin/subcategories',auth,admin,async(_req,res)=>{try{const {rows}=await pool.query(`SELECT s.*,c.slug category_slug FROM eurofy_subcategories s JOIN categories c ON c.id=s.category_id ORDER BY c.display_order,s.display_order,s.slug`);res.json({subcategories:rows});}catch{res.status(500).json({error:'Unable to load subcategories'});}});
+app.post('/api/admin/subcategories',auth,admin,async(req,res)=>{const b=req.body||{};if(!uuid(b.categoryId)||!safeText(b.slug,100)||!/^[a-z0-9-]+$/.test(b.slug)||!safeText(b.nameKa,180)||!safeText(b.nameEn,180)||!safeText(b.nameUk,180))return res.status(400).json({error:'Invalid subcategory'});try{const {rows}=await pool.query(`INSERT INTO eurofy_subcategories(category_id,slug,name_ka,name_en,name_uk,is_published) VALUES($1,$2,$3,$4,$5,false) RETURNING *`,[b.categoryId,b.slug,b.nameKa.trim(),b.nameEn.trim(),b.nameUk.trim()]);res.status(201).json({subcategory:rows[0]});}catch(e){res.status(e.code==='23505'?409:400).json({error:'Subcategory could not be created'});}});
+app.patch('/api/admin/subcategories/:id',auth,admin,async(req,res)=>{if(!uuid(req.params.id))return res.status(400).json({error:'Invalid subcategory id'});const fields={nameKa:'name_ka',nameEn:'name_en',nameUk:'name_uk',descriptionKa:'description_ka',descriptionEn:'description_en',descriptionUk:'description_uk',displayOrder:'display_order',published:'is_published'};const entries=Object.entries(req.body||{});if(!entries.length||entries.some(([k])=>!fields[k]))return res.status(400).json({error:'Invalid subcategory fields'});for(const [k,v] of entries){if(k==='published'?typeof v!=='boolean':k==='displayOrder'?(!Number.isInteger(v)||v<0||v>100000):typeof v!=='string'||v.length>2000)return res.status(400).json({error:'Invalid subcategory value'});}const sets=entries.map(([k],i)=>`${fields[k]}=$${i+2}`).join(',');try{const {rows}=await pool.query(`UPDATE eurofy_subcategories SET ${sets} WHERE id=$1 RETURNING *`,[req.params.id,...entries.map(x=>x[1])]);if(!rows.length)return res.status(404).json({error:'Subcategory not found'});res.json({subcategory:rows[0]});}catch{res.status(500).json({error:'Subcategory could not be updated'});}});
 app.post('/api/admin/categories',auth,admin,async(req,res)=>{
  const {name,slug}=req.body||{};
  if(!safeText(name,100)||!safeText(slug,100)||!/^[a-z0-9-]+$/.test(slug))return res.status(400).json({error:'Invalid category'});

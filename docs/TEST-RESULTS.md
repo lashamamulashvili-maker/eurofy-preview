@@ -1,3 +1,11 @@
+## Mission 6 Batch 2 category slice — 16 November 2026
+
+| Check | Result | Scope |
+|---|---|---|
+| `npm test` in `backend/` | PASS, 35/35 | Includes category API localization/counts, hidden subcategory behavior, migration fixture and non-admin authorization |
+| Server JavaScript parse | PASS | `node --check backend/server.js` |
+| Local migration | PASS | Migration 004 already applied to local PGlite; this batch adds API behavior only |
+
 ## Mission 5 localization verification — 16 November 2026
 
 | Check | Result | Scope |

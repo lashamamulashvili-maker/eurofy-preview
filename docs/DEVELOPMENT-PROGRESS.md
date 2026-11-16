@@ -1,3 +1,11 @@
+## Mission 6 Batch 2 — category storefront/API/admin slice
+
+- Verified remote and local feature branch at `14de98c9808f70848a6483aa0546de1141d72791` before editing; clean. Pre-edit backup: `/workspace/scratch/backups/eurofy-m6-resume-20261116T185258Z.tar.gz` (SHA-256 `2dcdfa4e968ebdfe3914186c3c55b63174f47b6c763f979eca0ec0cc5de04f61`).
+- Storefront category strip now presents all 15 stable categories in ka/en/uk and selects catalog filters. No demo products were added.
+- Public category and subcategory APIs return localized fields, display order, publication visibility, and catalog counts; public subcategory lists omit hidden categories/subcategories. Admin-only endpoints provide localized category editing, visibility/order controls, subcategory creation/editing/publication and list views. Existing authentication/role middleware protects mutations.
+- Added the admin category management screen and database integration assertions for category data and customer-role denial. `npm test` passes 35/35.
+- Not yet implemented in this batch: server-side paginated/sorted product result pages and product assignment to subcategories; supplier category mapping review/import UI; complete admin/product-prep localization and informational pages. No public deployment.
+
 # EUROFY Mission 5 — Russian-to-Ukrainian replacement (16 November 2026)
 
 - Verified branch `feature/eurofy-dropshipping-foundation` at `ab9a50ebafce987ba6ae23b126948c1f0fe98cbc`, clean and aligned with origin before edits. No production/main changes.

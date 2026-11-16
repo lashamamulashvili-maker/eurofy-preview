@@ -23,7 +23,7 @@ test('local HTTP storefront serves verified catalog and authenticated persistent
     await db.waitReady;
     await db.exec(await readFile(path.join(root,'database/schema.sql'),'utf8'));
     await runMigrations(db,path.join(root,'database/migrations'));
-    const category=(await db.query("INSERT INTO categories(name_ka,slug) VALUES('ტესტი','integration-test') RETURNING id")).rows[0];
+    const category=(await db.query("INSERT INTO categories(name_ka,slug,is_published) VALUES('ტესტი','integration-test',false) RETURNING id")).rows[0];
     const product=(await db.query("INSERT INTO products(category_id,title_ka,description_ka,price_gel_minor,image_url,is_active,publication_status) VALUES($1,'API ტესტ პროდუქტი','მომწოდებლის მიერ დადასტურებული',12500,'https://images.example.invalid/api-test.jpg',true,'published') RETURNING id",[category.id])).rows[0];
     const supplier=(await db.query("INSERT INTO eurofy_suppliers(supplier_code,display_name,provider_type,enabled,resale_authorized,resale_evidence_ref,terms_verified_at,direct_ship_countries) VALUES('API-MOCK','API Mock Supplier','mock',true,true,'contract:test',now(),ARRAY['GE']) RETURNING id")).rows[0];
     const offer=(await db.query("INSERT INTO eurofy_supplier_products(supplier_id,product_id,supplier_sku,currency_code,supplier_price_minor,authorized_for_resale,authorization_evidence_ref,direct_shipping_enabled,direct_ship_countries,terms_verified_at) VALUES($1,$2,'API-SKU','EUR',3000,true,'rights:test',true,ARRAY['GE'],now()) RETURNING id",[supplier.id,product.id])).rows[0];
@@ -41,6 +41,8 @@ test('local HTTP storefront serves verified catalog and authenticated persistent
     let health;
     for(let i=0;i<120;i++){if(child.exitCode!==null)throw Error('API exited early: '+logs);try{health=await fetch(base+'/api/health');if(health.ok)break}catch{}await new Promise(r=>setTimeout(r,250));}
     assert.equal(health?.status,200,'API did not become ready: '+logs);
+    const publicCategories=await fetch(base+'/api/categories');assert.equal(publicCategories.status,200);const categoryData=await publicCategories.json();assert.equal(categoryData.categories.length,15);assert.equal(categoryData.categories[0].slug,'fashion');assert.ok(categoryData.categories.every(c=>Number.isInteger(c.product_count)&&c.name_en&&c.name_uk));
+    const publicSubcategories=await fetch(base+'/api/categories/fashion/subcategories');assert.equal(publicSubcategories.status,200);assert.deepEqual((await publicSubcategories.json()).subcategories,[]);
     const home=await fetch(base+'/');assert.equal(home.status,200);assert.match(await home.text(),/EUROFY/);
     assert.equal((await fetch(base+'/backend/server.js')).status,404);
     const catalog=await fetch(base+'/api/products?q=API');assert.equal(catalog.status,200);const listed=(await catalog.json()).products;assert.equal(listed.length,1);assert.equal(listed[0].id,product.id);assert.equal(listed[0].price_gel_minor,12500);
@@ -65,6 +67,8 @@ test('local HTTP storefront serves verified catalog and authenticated persistent
     const mockReplay=await fetch(base+'/api/my-orders/'+result.order.id+'/mock-payment',{method:'POST',headers:{...auth,'Idempotency-Key':'mock-payment-integration-01'},body:'{}'});assert.equal(mockReplay.status,200);assert.equal((await mockReplay.json()).duplicate,true);
     const paidDetail=await fetch(base+'/api/my-orders/'+result.order.id,{headers:{Authorization:'Bearer '+token}});const paidBody=await paidDetail.json();assert.equal(paidBody.order.payment_mode,'mock');assert.equal(paidBody.order.payment_status,'paid');
     const forbiddenAdmin=await fetch(base+'/api/admin/orders',{headers:{Authorization:'Bearer '+token}});assert.equal(forbiddenAdmin.status,403);
+    assert.equal((await fetch(base+'/api/admin/categories',{headers:auth})).status,403);
+    assert.equal((await fetch(base+'/api/admin/subcategories',{headers:auth})).status,403);
     const forbiddenHybridAdmin=await fetch(base+'/api/admin/hybrid-fulfillments',{headers:{Authorization:'Bearer '+token}});assert.equal(forbiddenHybridAdmin.status,403);
     const addressDelete=await fetch(base+'/api/addresses/'+savedAddress.id,{method:'DELETE',headers:{Authorization:'Bearer '+token}});assert.equal(addressDelete.status,204);
     const altered=await fetch(base+'/api/orders',{method:'POST',headers:{...auth,'Idempotency-Key':'integration-order-0001'},body:JSON.stringify({...orderBody,deliveryAddress:'Different address 2'})});assert.equal(altered.status,409);
