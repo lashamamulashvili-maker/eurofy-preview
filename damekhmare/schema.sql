@@ -77,14 +77,6 @@ CREATE TABLE IF NOT EXISTS dm_reviews (
  comment text NOT NULL DEFAULT '',
  created_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE TABLE IF NOT EXISTS dm_subscriptions (
- account_id uuid PRIMARY KEY REFERENCES dm_accounts(id) ON DELETE CASCADE,
- price_gel_minor integer NOT NULL DEFAULT 2000 CHECK(price_gel_minor=2000),
- status text NOT NULL DEFAULT 'inactive' CHECK(status IN ('inactive','test_active','active','expired')),
- auto_renew_opt_in boolean NOT NULL DEFAULT false,
- expires_at timestamptz,
- updated_at timestamptz NOT NULL DEFAULT now()
-);
 CREATE TABLE IF NOT EXISTS dm_audit_log (
  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
  actor_id uuid REFERENCES dm_accounts(id),
