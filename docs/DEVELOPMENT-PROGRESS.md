@@ -41,3 +41,5 @@ See [HYBRID-FULFILLMENT.md](HYBRID-FULFILLMENT.md) for the implementation plan a
 - Created verified persistent local database archive `/workspace/scratch/backups/eurofy-mission3-local-db-20261116T173647Z.tar.gz` (SHA-256 `b1d0ed0c27cd14261e87f28c18d21e9258fd7fbb1371f07925202ed030c54b0d`). Extracted it to a separate temporary path, reopened PGlite, and confirmed the users table plus both migration records.
 - Added a GitHub Actions verification job for pushes to `main` and the EUROFY development branch plus pull requests. It uses `npm ci`, runs the automated suite, and checks modified backend and storefront syntax; this workflow definition was committed but no hosted Actions run was performed here.
 - Local mode is bound to `127.0.0.1` and serves only the storefront, admin page, robots file, and approved assets. The API source, docs, migrations, and local database directory are not exposed as static files.
+
+- Final read-only Render metadata check: `eurofy-preview-db` is available, unsuspended, PostgreSQL 17, free plan, expiry 15 December 2026. Read-only SQL remains blocked by the empty IP allowlist. No Render setting or database was changed.

@@ -49,6 +49,6 @@ The hosted Render database could not be queried: its IP allowlist is empty and t
 
 The integration test started an isolated temporary PGlite database and local HTTP API, seeded only test products with explicit mock supplier/image permissions, then verified catalog exposure, account registration and login, authenticated cart persistence, over-stock rejection, unpaid order creation, retry idempotency, conflict rejection for a reused key with changed data, and that no live payment flow is connected.
 
-The persistent working development database is local under `.eurofy-data/` and is ignored by Git. Render was not queried or modified in this batch. No purchase, charge, public deployment, or supplier API call occurred.
+The persistent working development database is local under `.eurofy-data/` and is ignored by Git. Render database metadata was checked read-only: available, free PostgreSQL 17, expiry 15 December 2026. The SQL query was blocked by its empty IP allowlist. No Render setting or database was modified. No purchase, charge, public deployment, or supplier API call occurred.
 
 The persistent `.eurofy-data/` archive was verified with `gzip -t`, restored into a separate temporary directory, reopened by PGlite, and checked for the users table and both recorded migrations. The source checkout backup and database backup are separate artifacts.
