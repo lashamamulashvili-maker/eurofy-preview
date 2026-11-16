@@ -1,18 +1,27 @@
 name: Validate EUROFY source
 on:
   push:
-    branches: [main]
+    branches: [main, feature/eurofy-dropshipping-foundation]
   pull_request:
 jobs:
-  syntax:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Check backend JavaScript
-        run: node --check backend/server.js
-      - name: Check inline storefront JavaScript
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install backend dependencies
+        run: npm ci --prefix backend
+      - name: Run backend, migration, and HTTP integration tests
+        run: npm test --prefix backend
+      - name: Check backend JavaScript syntax
+        run: |
+          node --check backend/server.js
+          node --check backend/local-database.js
+          node --check backend/storefront-repository.js
+      - name: Check inline storefront JavaScript syntax
         run: |
           node --input-type=module -e "import fs from 'node:fs'; import vm from 'node:vm'; const html=fs.readFileSync('index.html','utf8'); const m=html.match(/<script>([\s\S]*?)<\/script>/); if(!m) throw new Error('No script'); new vm.Script(m[1]); console.log('Storefront syntax valid');"

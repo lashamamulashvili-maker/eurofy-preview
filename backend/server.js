@@ -4,6 +4,10 @@ import rateLimit from 'express-rate-limit';
 import pg from 'pg';
 import bcrypt from 'bcryptjs';
 import {randomBytes,createHash} from 'node:crypto';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {openLocalPglite} from './local-database.js';
+import {getPersistentCart,listStoreProducts,setPersistentCartItem} from './storefront-repository.js';
 
 const app = express();
 // Render terminates HTTPS at its reverse proxy. Trust only the nearest proxy hop
@@ -17,7 +21,8 @@ app.use('/api',rateLimit({windowMs:15*60*1000,limit:120,standardHeaders:'draft-7
 const allowedOrigins=new Set((process.env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean));
 app.use('/api',(req,res,next)=>{
  const origin=req.get('origin');
- if(origin&&!allowedOrigins.has(origin))return res.status(403).json({error:'Origin not allowed'});
+ const localStoreOrigin=process.env.EUROFY_SERVE_STORE==='1'&&/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin||'')&&/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.get('host')||'');
+ if(origin&&!allowedOrigins.has(origin)&&!localStoreOrigin)return res.status(403).json({error:'Origin not allowed'});
  if(origin){res.set('Access-Control-Allow-Origin',origin);res.set('Vary','Origin');res.set('Access-Control-Allow-Methods','GET,POST,PATCH,PUT,OPTIONS');res.set('Access-Control-Allow-Headers','Authorization,Content-Type');}
  if(req.method==='OPTIONS')return res.status(204).end();
  next();
@@ -35,7 +40,9 @@ async function eurGelRate(){
  fxCache={rate,date:data[0].date,source:'National Bank of Georgia',fetchedAt:Date.now()};return fxCache;
 }
 app.get('/api/exchange-rate',async(_req,res)=>{try{const {rate,date,source}=await eurGelRate();res.json({base:'EUR',quote:'GEL',rate,date,source,indicative:true});}catch{res.status(503).json({error:'Official exchange rate unavailable'});}});
-const pool = process.env.DATABASE_URL ? new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSLMODE==='require'?{rejectUnauthorized:true}:undefined}) : null;
+const pool = process.env.EUROFY_DATABASE_MODE==='pglite'
+ ? await openLocalPglite()
+ : process.env.DATABASE_URL ? new pg.Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.PGSSLMODE==='require'?{rejectUnauthorized:true}:undefined}) : null;
 app.get('/api/health',async(_req,res)=>{
  if(!pool)return res.json({ok:true,databaseConfigured:false,databaseConnected:false});
  try{await pool.query('SELECT 1');res.json({ok:true,databaseConfigured:true,databaseConnected:true});}
@@ -43,10 +50,8 @@ app.get('/api/health',async(_req,res)=>{
 });
 app.get('/api/products',async(_req,res)=>{
  if(!pool)return res.status(503).json({error:'Database not configured'});
- try{
-  const {rows}=await pool.query('SELECT p.id,p.title_ka,p.description_ka,p.price_gel_minor,p.original_price_gel_minor,p.image_url,c.name_ka AS category FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.is_active=true ORDER BY p.created_at DESC LIMIT 100');
-  res.json({products:rows});
- }catch(e){console.error('Product catalog query failed:',{code:e.code||'UNKNOWN',message:e.message});res.status(500).json({error:'Unable to load products'});}
+ try{const rows=await listStoreProducts(pool,{search:typeof _req.query.q==='string'?_req.query.q:'',category:typeof _req.query.category==='string'?_req.query.category:'',limit:60});res.set('Cache-Control','no-store').json({products:rows});}
+ catch(e){console.error('Product catalog query failed:',{code:e.code||'UNKNOWN',message:e.message});res.status(e.code==='42P01'||e.code==='42703'?503:400).json({error:e.code==='42P01'||e.code==='42703'?'Verified catalog migration required':'Unable to load products'});}
 });
 const registerLimit=rateLimit({windowMs:60*60*1000,limit:5,standardHeaders:'draft-7',legacyHeaders:false});
 app.post('/api/register',registerLimit,async(req,res)=>{
@@ -91,6 +96,16 @@ app.post('/api/login',loginLimit,async(req,res)=>{
  }catch{res.status(500).json({error:'Login unavailable'});}
 });
 app.get('/api/me',auth,(req,res)=>res.set('Cache-Control','no-store').json({user:req.user}));
+app.get('/api/cart',auth,async(req,res)=>{
+ try{const items=await getPersistentCart(pool,req.user.id);res.set('Cache-Control','no-store').json({items});}
+ catch(e){console.error('Persistent cart read failed:',{code:e.code||'UNKNOWN',message:e.message});res.status(503).json({error:'Persistent cart is unavailable; apply local migrations'});}
+});
+app.put('/api/cart/items/:productId',auth,async(req,res)=>{
+ const quantity=req.body?.quantity;
+ if(!uuid(req.params.productId)||!Number.isInteger(quantity)||quantity<0||quantity>20)return res.status(400).json({error:'Quantity must be an integer from 0 to 20'});
+ try{const item=await setPersistentCartItem(pool,{userId:req.user.id,productId:req.params.productId,quantity});res.set('Cache-Control','no-store').json({item});}
+ catch(e){const unavailable=['PRODUCT_UNAVAILABLE','STOCK_UNAVAILABLE'].includes(e.code);res.status(unavailable?409:e instanceof TypeError?400:503).json({error:unavailable?e.message:'Persistent cart update failed'});}
+});
 app.get('/api/profile',auth,async(req,res)=>{
  try{const {rows}=await pool.query('SELECT id,email,full_name,phone,address,city,customer_code FROM users WHERE id=$1',[req.user.id]);if(!rows.length)return res.status(404).json({error:'Profile not found'});res.set('Cache-Control','no-store').json({profile:rows[0]});}
  catch{res.status(500).json({error:'Unable to load profile'});}
@@ -112,23 +127,36 @@ app.get('/api/my-orders',auth,async(req,res)=>{
 // Orders remain unpaid until a separately integrated payment provider verifies payment.
 app.post('/api/orders',auth,async(req,res)=>{
  const {items,deliveryName,deliveryPhone,deliveryAddress}=req.body||{};
- if(!Array.isArray(items)||items.length<1||items.length>40||items.some(i=>!i||typeof i.productId!=='string'||!/^[0-9a-f-]{36}$/i.test(i.productId)||!Number.isInteger(i.quantity)||i.quantity<1||i.quantity>20)||typeof deliveryName!=='string'||deliveryName.trim().length<2||deliveryName.length>120||typeof deliveryPhone!=='string'||deliveryPhone.length<5||deliveryPhone.length>40||typeof deliveryAddress!=='string'||deliveryAddress.trim().length<8||deliveryAddress.length>500)return res.status(400).json({error:'Invalid order fields'});
+ const idempotencyKey=req.get('idempotency-key')||'';
+ if(!/^[A-Za-z0-9._:-]{16,200}$/.test(idempotencyKey)||!Array.isArray(items)||items.length<1||items.length>40||items.some(i=>!i||!uuid(i.productId)||!Number.isInteger(i.quantity)||i.quantity<1||i.quantity>20)||typeof deliveryName!=='string'||deliveryName.trim().length<2||deliveryName.length>120||typeof deliveryPhone!=='string'||!/^[+0-9 ()-]{7,24}$/.test(deliveryPhone.trim())||typeof deliveryAddress!=='string'||deliveryAddress.trim().length<8||deliveryAddress.length>500)return res.status(400).json({error:'Invalid order fields or missing idempotency key'});
  const ids=items.map(i=>i.productId);if(new Set(ids).size!==ids.length)return res.status(400).json({error:'Duplicate products'});
+ const requestHash=createHash('sha256').update(JSON.stringify({items:[...items].sort((a,b)=>a.productId.localeCompare(b.productId)),deliveryName:deliveryName.trim(),deliveryPhone:deliveryPhone.trim(),deliveryAddress:deliveryAddress.trim()})).digest('hex');
  let client;
  try{
   client=await pool.connect();
   await client.query('BEGIN');
-  const {rows}=await client.query('SELECT id,title_ka,price_gel_minor FROM products WHERE is_active=true AND id=ANY($1::uuid[])',[ids]);
-  if(rows.length!==items.length){await client.query('ROLLBACK');return res.status(409).json({error:'Products unavailable'});}
+  const reserved=await client.query(`INSERT INTO eurofy_order_request_keys(user_id,idempotency_key,request_hash) VALUES($1,$2,$3)
+    ON CONFLICT(user_id,idempotency_key) DO NOTHING RETURNING id`,[req.user.id,idempotencyKey,requestHash]);
+  if(!reserved.rows.length){
+   const previous=(await client.query(`SELECT k.request_hash,o.id,o.order_number,o.status,o.payment_status,o.total_gel_minor
+     FROM eurofy_order_request_keys k LEFT JOIN orders o ON o.id=k.order_id WHERE k.user_id=$1 AND k.idempotency_key=$2 FOR UPDATE OF k`,[req.user.id,idempotencyKey])).rows[0];
+   if(!previous||previous.request_hash!==requestHash){await client.query('ROLLBACK');return res.status(409).json({error:'Idempotency key was already used for a different order'});}
+   if(!previous.id){await client.query('ROLLBACK');return res.status(409).json({error:'Matching order request is still being processed'});}
+   await client.query('COMMIT');res.set('Cache-Control','no-store').status(200).json({order:{id:previous.id,order_number:previous.order_number,status:previous.status,payment_status:previous.payment_status,total_gel_minor:previous.total_gel_minor},duplicate:true,notice:'Unpaid development order request; no supplier order or payment was initiated.'});return;
+  }
+  const rows=await listStoreProducts(client,{limit:100});
   const byId=new Map(rows.map(p=>[p.id,p]));
+  if(ids.some(id=>!byId.has(id))){await client.query('ROLLBACK');return res.status(409).json({error:'One or more products lack current verified purchase eligibility'});}
   const total=items.reduce((n,i)=>n+byId.get(i.productId).price_gel_minor*i.quantity,0);
   if(!Number.isSafeInteger(total)||total<0)throw Error('Invalid total');
   const number='EF-'+Date.now().toString(36).toUpperCase()+'-'+randomBytes(4).toString('hex').toUpperCase();
-  const {rows:created}=await client.query('INSERT INTO orders(order_number,user_id,total_gel_minor,delivery_name,delivery_phone,delivery_address) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,order_number,status,payment_status,total_gel_minor',[number,req.user.id,total,deliveryName.trim(),deliveryPhone.trim(),deliveryAddress.trim()]);
+  const {rows:created}=await client.query("INSERT INTO orders(order_number,user_id,total_gel_minor,delivery_name,delivery_phone,delivery_address,fulfillment_note) VALUES($1,$2,$3,$4,$5,$6,'Unpaid development request; awaiting route quote and administrator review') RETURNING id,order_number,status,payment_status,total_gel_minor",[number,req.user.id,total,deliveryName.trim(),deliveryPhone.trim(),deliveryAddress.trim()]);
   for(const i of items){const p=byId.get(i.productId);await client.query('INSERT INTO order_items(order_id,product_id,product_title_snapshot,unit_price_gel_minor,quantity) VALUES($1,$2,$3,$4,$5)',[created[0].id,p.id,p.title_ka,p.price_gel_minor,i.quantity]);}
+  await client.query('DELETE FROM eurofy_shopping_cart_items WHERE cart_id=(SELECT id FROM eurofy_shopping_carts WHERE user_id=$1) AND product_id=ANY($2::uuid[])',[req.user.id,ids]);
+  await client.query('UPDATE eurofy_order_request_keys SET order_id=$2 WHERE user_id=$1 AND idempotency_key=$3',[req.user.id,created[0].id,idempotencyKey]);
   await client.query('COMMIT');
-  res.status(201).json({order:created[0],notice:'Order is unpaid. No purchase or shipment has been initiated.'});
- }catch{if(client)await client.query('ROLLBACK').catch(()=>{});res.status(500).json({error:'Order could not be created'});}
+  res.set('Cache-Control','no-store').status(201).json({order:created[0],duplicate:false,notice:'Unpaid development order request; no supplier order or payment was initiated.'});
+ }catch(e){if(client)await client.query('ROLLBACK').catch(()=>{});console.error('Development order request failed:',{code:e.code||'UNKNOWN',message:e.message});res.status(e.code==='42P01'||e.code==='42703'?503:500).json({error:e.code==='42P01'||e.code==='42703'?'Order migration is not applied':'Order could not be created'});}
  finally{if(client)client.release();}
 });
 app.get('/api/admin/orders',auth,admin,async(_req,res)=>{
@@ -231,6 +259,15 @@ app.post('/api/admin/categories',auth,admin,async(req,res)=>{
  try{const {rows}=await pool.query('INSERT INTO categories(name_ka,slug) VALUES($1,$2) RETURNING *',[name.trim(),slug]);res.status(201).json({category:rows[0]});}
  catch(e){res.status(e.code==='23505'?409:500).json({error:'Category could not be created'});}
 });
+if(process.env.EUROFY_SERVE_STORE==='1'){
+ const projectRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+ app.get('/',(_req,res)=>res.sendFile(path.join(projectRoot,'index.html')));
+ app.get('/admin.html',(_req,res)=>res.sendFile(path.join(projectRoot,'admin.html')));
+ app.get('/robots.txt',(_req,res)=>res.sendFile(path.join(projectRoot,'robots.txt')));
+ app.use('/assets',express.static(path.join(projectRoot,'assets'),{dotfiles:'deny',fallthrough:true}));
+}
 app.use('/api',(_req,res)=>res.status(404).json({error:'Not found'}));
 const port=Number(process.env.PORT||3000);
-app.listen(port,()=>console.log('EUROFY API listening on '+port));
+const onListen=()=>console.log('EUROFY API listening on '+port);
+const server=process.env.EUROFY_LOCAL_ONLY==='1'?app.listen(port,'127.0.0.1',onListen):app.listen(port,onListen);
+for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>server.close(async()=>{try{await pool?.end?.()}finally{process.exit(0)}}));

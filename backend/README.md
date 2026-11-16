@@ -1,31 +1,36 @@
 # EUROFY backend — development foundation
 
-**Status: development foundation.** Render reports a separate API service configured from `main`, but API health, database connection, schema state, and secrets were not verified in the 16 November 2026 audit. The static storefront remains a separate preview and is not connected to the API. No live payments or shipments.
+**Status: local development application, not production-ready.** The local Express app can serve the storefront and API from one origin using embedded PGlite storage. The public Render preview remains static and disconnected; production is untouched. No live payments or shipments.
 
 ## Implemented in source
 - PostgreSQL tables: users, categories, products, orders, items, sessions, supplier purchases, shipments
-- Active products listing
+- Verified catalog API with search/category filters; published listings require enabled supplier resale authorization, fresh stock and price evidence, separate Georgia shipping permission, and verified image licensing
 - Customer registration with bcrypt password hashing
 - Login, 7-day opaque bearer sessions (SHA-256 digests in database), profile, logout
 - Authenticated order creation with server-side product prices and transactional item writes
 - Customer order history and admin-only order listing
-- Orders are explicitly **unpaid**; no payment or shipment is initiated
+- Persistent authenticated carts, server-side eligibility/stock checks, and idempotent unpaid order requests; no payment or supplier shipment is initiated
 - Request size limits, basic input validation, rate limits, security headers, parameterized queries
 - Offline hybrid-route evaluation and fulfillment transition validation; the existing API routes do not yet call this module
-- Additive hybrid schema migration, checksum-tracked local migration runner, and transactional fulfillment repository with idempotency/audit checks
-- PGlite migration and repository tests run in memory; the hosted Render database has not been changed
+- Additive hybrid schema migrations, checksum-tracked local migration runner, transactional fulfillment repository, and order-request idempotency
+- Local PGlite database stores persistent development data; integration tests exercise real HTTP catalog, auth, cart, and unpaid order-request paths. Render has not been changed
 
-## Local setup
-1. Install Node.js 20+ and PostgreSQL.
-2. Create a dedicated empty local database and apply `database/schema.sql` from the repository root: `createdb eurofy_local` then `psql postgresql://localhost/eurofy_local -v ON_ERROR_STOP=1 -f database/schema.sql`.
-3. In `backend/`, run `npm install`. Set `DATABASE_URL` to `postgresql://localhost/eurofy_local` and run `npm run migrate:local`; the runner rejects non-loopback hosts and is not called by the API server.
+## Local setup (recommended: embedded PGlite)
+1. Install Node.js 20+.
+2. From `backend/`, run `npm ci`.
+3. Initialize the local database and additive migrations with `npm run migrate:pglite`. The database lives in the ignored repository-root `.eurofy-data/` directory.
 4. Run `npm test`.
-5. Start the API with `npm start`. Stop it with Ctrl+C.
-6. Check `GET /api/health` and `GET /api/products` against local data.
+5. Start the storefront and API together with `npm run dev:local`; open `http://localhost:3000`. Stop with Ctrl+C.
+6. Confirm `/api/health` reports database connected. The catalog is empty until an administrator adds fully authorized offers with verified rights and current stock/price evidence.
 
-## Local backup and restore check
+## Standard local PostgreSQL alternative
+Create a dedicated local database, apply `database/schema.sql` from the repository root, set loopback-only `DATABASE_URL`, then run `npm run migrate:local` from `backend/`. The migration runner rejects non-loopback hosts. Start the API with `npm start`; `npm run dev:local` is specifically configured for PGlite mode.
 
-Run these from the repository root with a local `DATABASE_URL`; keep backup files out of Git and do not use a production URL here:
+## Local backup and restore
+
+For embedded PGlite, stop the app first, then from the repository root run `mkdir -p backups && tar -czf backups/eurofy-pglite-$(date -u +%Y%m%dT%H%M%SZ).tar.gz .eurofy-data && gzip -t backups/eurofy-pglite-*.tar.gz`. To verify recovery, extract one archive to a new directory with `mkdir -p /tmp/eurofy-restore && tar -xzf backups/ARCHIVE.tar.gz -C /tmp/eurofy-restore`, then run `EUROFY_LOCAL_DB_DIR=/tmp/eurofy-restore/.eurofy-data node backend/migrate.js --pglite`; it should report migrations skipped after checksum validation. Do not extract over the primary local database.
+
+For standard local PostgreSQL, run the following from the repository root with a loopback `DATABASE_URL`; keep backup files out of Git:
 
 ```sh
 mkdir -p backups

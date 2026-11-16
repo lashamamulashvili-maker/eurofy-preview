@@ -27,3 +27,17 @@ No payment provider, real supplier order, customer charge, supplier API activati
 - Remaining gap: the API routes and storefront do not yet call the hybrid repository/domain module. The migration has not been run against Render or any owner-controlled database.
 
 See [HYBRID-FULFILLMENT.md](HYBRID-FULFILLMENT.md) for the implementation plan and boundaries.
+
+## 16 November 2026 — Mission 3 local storefront integration
+
+- Reconnected to the feature branch at `673718e54a523b6eef3592374911903ca21e28de`; branch was clean and aligned with origin. The 29/29 baseline suite passed before edits.
+- Created and verified pre-edit archive `/workspace/scratch/backups/eurofy-mission3-before-20261116T171347Z.tar.gz` (SHA-256 `2c12afa93f7025a690a6a3dbaac485f28412019877629239cc71987aa44ee04a`).
+- Added a persistent local PGlite database mode, explicit `migrate:pglite` initialization, same-origin local app startup (`dev:local`), and graceful server shutdown. The standard PostgreSQL migration path remains loopback-only; no Render database was accessed.
+- Added a server-filtered catalog that excludes demo/unpublished products and requires supplier resale evidence, fresh stock and supplier-price history, a Georgia-permitted route, and verified image rights. Added authenticated persistent cart endpoints with quantity/stock checks.
+- Connected the Georgian storefront to the local catalog/API, sessionStorage-backed short-lived browser session token, persistent authenticated cart, and order history. Checkout creates only an unpaid, idempotent development order request after server-side revalidation; it explicitly does not initiate payment, reserve supplier purchases, or claim shipping costs are verified.
+- Added `20261116_002_order_request_idempotency.sql`. Added HTTP integration coverage for local static delivery, catalog filters, CORS preflight, registration/login, persistent cart quantity checks, idempotent order creation, and unpaid status.
+- Remaining work includes quote-backed route selection at checkout, creating fulfillment records from confirmed quotes, admin UX, address book CRUD, tracking screens, and provider integrations. The public preview remains static and unchanged.
+
+- Created verified persistent local database archive `/workspace/scratch/backups/eurofy-mission3-local-db-20261116T173647Z.tar.gz` (SHA-256 `b1d0ed0c27cd14261e87f28c18d21e9258fd7fbb1371f07925202ed030c54b0d`). Extracted it to a separate temporary path, reopened PGlite, and confirmed the users table plus both migration records.
+- Added a GitHub Actions verification job for pushes to `main` and the EUROFY development branch plus pull requests. It uses `npm ci`, runs the automated suite, and checks modified backend and storefront syntax; this workflow definition was committed but no hosted Actions run was performed here.
+- Local mode is bound to `127.0.0.1` and serves only the storefront, admin page, robots file, and approved assets. The API source, docs, migrations, and local database directory are not exposed as static files.

@@ -3,12 +3,12 @@
 Georgian-language European product storefront.
 
 ## Current deployment
-Static mobile-friendly demo: https://eurofy-preview.onrender.com
+Public preview: https://eurofy-preview.onrender.com. It remains a static preview and is not connected to the development database or the API branch. Do not use it for real orders or personal data.
 
-The demo uses illustrative Unsplash images and prices. Its cart and orders use browser localStorage. No real purchases, payment, fulfillment or customer accounts.
+The local app serves the existing EUROFY design and approved family banner from the same origin as its development API. The purchase catalog only shows published products with current stock/price evidence, resale authorization, Georgia route permission, and verified image licensing; an empty catalog is expected until these checks are populated.
 
 ## Structure
-- `index.html` — public storefront demo (standalone static file)
+- `index.html` — Georgian storefront connected to local catalog, account, cart, and unpaid order-request APIs
 - `backend/` — Node.js/Express API foundation (not deployed)
 - `database/schema.sql` — PostgreSQL database schema (not provisioned)
 - `docs/ARCHITECTURE.md` — technical plan, boundaries, implementation stages
@@ -17,9 +17,7 @@ The demo uses illustrative Unsplash images and prices. Its cart and orders use b
 
 ## Local preview and API
 
-The current storefront is a standalone demo page. From the repository root, start it with `python3 -m http.server 8080`, then open `http://localhost:8080`; stop it with Ctrl+C. This serves the demo UI only and does not connect it to the API.
-
-For the local database-backed API, follow [`backend/README.md`](backend/README.md). From `backend/`, run `npm install`, `npm test`, then set a local-only `DATABASE_URL` and run `npm start`. Database setup, migration, backup, and restore commands are documented there. Do not use production secrets in the local environment.
+For the persistent embedded PostgreSQL-compatible local app, follow [`backend/README.md`](backend/README.md). From `backend/`, run `npm ci`, `npm test`, `npm run migrate:pglite`, and `npm run dev:local`; open `http://localhost:3000`. Stop with Ctrl+C. Local data is stored in the ignored `.eurofy-data/` directory. A standard local PostgreSQL server can also be used with the loopback-only migration command documented in the backend guide.
 
 ## Safety
 Do not submit real personal data to demo checkout.

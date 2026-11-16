@@ -32,3 +32,10 @@ An EU delivery destination is not treated as permission to resell or export onwa
 ## Verification boundary
 
 The migration has been exercised against an ephemeral PGlite PostgreSQL database, including rollback, checksum, rerun, and preservation checks. It has **not** been applied to the Render database. The API routes, browser UI, and shipment integrations do not yet consume this schema or domain module; therefore the hybrid platform is not yet a complete customer-facing flow.
+
+## Mission 3 storefront wiring
+
+- `/api/products` now calls the verified catalog repository and accepts server-side `q` and category filters. It hides demo/unpublished offers and requires current stock/price, explicit resale and Georgia shipping evidence, and a verified image license. The ordinary storefront consumes this response; an empty catalog is expected until authorized products are entered.
+- Authenticated `GET /api/cart` and `PUT /api/cart/items/:productId` persist cart lines and reject ineligible products or quantities beyond unreserved stock. The storefront keeps guest cart data in the browser and syncs valid UUID items after account login.
+- `POST /api/orders` now requires an idempotency key, revalidates catalog prices and eligibility on the server, writes the order and item snapshots transactionally, and leaves `payment_status='unpaid'`. The UI calls this an unpaid development order request. It does not create a fulfillment record, reserve inventory, or claim a delivery estimate. Route quote selection and reservation remain a required next step before any checkout could be considered production-ready.
+- `backend/local-database.js`, `backend/migrate.js --pglite`, and `backend/dev.js` provide a persistent embedded PostgreSQL-compatible local database and same-origin local storefront/API. Data is stored outside Git in `.eurofy-data/`.

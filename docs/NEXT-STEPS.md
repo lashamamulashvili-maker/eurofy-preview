@@ -10,3 +10,12 @@ Prioritize work in this order. Items requiring a contract, account credential, f
 6. **Complete customer/admin tests.** Add API/database transaction tests, role/authorization coverage, duplicate/idempotency checks, mock-only E2E checkout, and responsive/accessibility tests.
 7. **Resolve external launch dependencies.** Obtain supplier resale/media rights, explicit Georgia direct-ship and EU-export terms, verified forwarding/carrier rates, an appropriate payment provider, and professional German/EU and Georgian legal/tax/customs review.
 8. **Owner review on target computer.** Reconcile the development branch with any local changes, inspect the approved banner/logo on devices, verify a database backup/restore, and use the release review procedure before any later production decision.
+
+## Mission 3 implementation status
+
+1. Local persistent PGlite mode and same-origin storefront/API are available using the commands in `backend/README.md`.
+2. Catalog API and authenticated cart are now connected and covered by repository plus HTTP integration tests. Only products with verified supplier, shipping, stock, price, and image-rights evidence can appear.
+3. Development order requests are server-priced, idempotent, transactional, and always unpaid. They do not yet choose a shipping route or create fulfillment records.
+4. Next implement quote-backed route selection and fulfillment creation with inventory reservations inside the order transaction; then customer shipment tracking and admin review actions.
+5. Add address-book CRUD, customer order detail/cancellation paths, and tested admin supplier/product authorization screens.
+6. Keep Syncee/API, supplier contracts, forwarding rates, payment service, legal review, and Render access blocked until separately authorized/available. Public preview remains static and production untouched.
