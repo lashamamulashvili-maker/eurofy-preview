@@ -2,20 +2,20 @@
 
 ## Environments
 - Preview: existing Render static site, public, demo products and browser-only demo orders.
-- API: separate Node.js/Express service (source in backend/), **not deployed**.
-- Database: PostgreSQL (schema in database/schema.sql), **not provisioned**.
+- API: a separate Render Node.js/Express service is configured to deploy the `main` branch from `backend/`. Its live health and schema state have not been verified in this audit.
+- Database: a Render PostgreSQL instance exists on the free plan; its reported expiry is 15 December 2026. Connection, schema state, backups, and retention were not verified.
 - Production: separate service, domain and credentials; do not reuse Preview for payments.
 
 ## Modules
 | Module | Frontend | API / database | External dependency |
 |---|---|---|---|
-| Homepage and catalog | Demo working | Products/categories schema and GET /api/products | Real product feed |
+| Homepage and catalog | Demo working | Products/categories schema and GET /api/products | Authorized real product feed |
 | Search/filter/sort | Working on demo catalog | Public catalog query future | None |
 | Product detail and cart | Demo working | Orders/items schema | None |
-| Registration/login | Not connected | Initial endpoints and sessions | Email delivery/verification |
-| Customer account/orders | Demo orders only | GET /api/me, GET /api/my-orders | Auth frontend |
-| Admin | Not connected | GET /api/admin/orders | Admin role assignment |
-| Supplier purchases | Planned | Supplier purchase schema | Supplier credentials and allowed API |
+| Registration/login | Not connected | API registration/login and hashed opaque sessions in source | Email delivery/verification; security review |
+| Customer account/orders | Demo orders only | Profile and unpaid order endpoints in source | Auth frontend and integration tests |
+| Admin | Source exists, not connected to storefront | Admin product, category, pricing, order, and manual supplier-feed routes | Audit log, controlled role assignment, integration tests |
+| Supplier purchases | Draft only | Offline offer/pricing helper; API supplier-purchase table | Supplier rights and API credentials; owner-approved purchase flow |
 | Warehouse | Planned | Shipments schema | Actual warehouse operations |
 | Georgia shipping | Planned | Shipment fields | Carrier contract and rates |
 | Payment | Disabled | payment_status unpaid | Provider contract and webhooks |

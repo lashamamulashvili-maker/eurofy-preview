@@ -1,0 +1,12 @@
+# EUROFY next steps
+
+Prioritize work in this order. Items requiring a contract, account credential, fee, legal decision, or owner-controlled local machine remain blocked until those inputs exist.
+
+1. **Protect data and establish environments.** Confirm the Render database's retention/expiry and backup needs; export and verify a backup before its listed 15 December 2026 expiry. Keep staging separate from any production data.
+2. **Make the product catalog real.** Add supplier identity, supplier SKU, resale authorization, image license evidence, currency, stock freshness, and destination eligibility. Keep products hidden until all mandatory fields are verified; add search, category, price, and stock filters over the database-backed catalog.
+3. **Connect a non-purchasing storefront.** Wire catalog, registration/login, profile, order history, and unpaid order creation to the API only after verifying staging schema and CORS. Keep all payment and supplier-order actions disabled. Replace local demo checkout with a clearly labeled development order flow.
+4. **Complete persistence and tests.** Introduce ordered, repeatable database migrations and rollback/backup procedures. Add isolated PostgreSQL integration tests, auth/access-control tests, API validation tests, and mock-only browser tests.
+5. **Build supplier adapters in mock mode.** Define a versioned adapter contract, idempotent feed imports, stock/price snapshots, failed-import reporting, and duplicate-order protection. Syncee awaits manual API enablement; Outlet46 has no permitted automatic feed.
+6. **Complete fulfillment and admin controls.** Expand the current legacy fulfillment statuses to the intended payment-pending/verified, supplier-review, forwarding, customs, delivery, cancellation, and refund lifecycle. Add transactional transition guards, audit history, roles, and shipment events. Keep supplier purchase unreachable until separate owner authorization and provider controls exist.
+7. **Resolve launch dependencies.** Obtain written supplier permissions, Georgia delivery and return terms, accurate forwarding/carrier rates, a payment provider that supports the merchant, and professional German/EU and Georgian legal/tax/customs review.
+8. **Owner review on the target computer.** Reconnect the actual Windows/Mac project, reconcile the feature branch without overwriting local work, verify the logo and approved family banner, and follow the release review instructions before any public launch.

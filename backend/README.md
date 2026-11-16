@@ -1,7 +1,6 @@
 # EUROFY backend — development foundation
 
-**Status: code committed, NOT deployed, NOT connected to the public static preview.**
-The public Render service remains a static storefront demo. No live payments or shipments.
+**Status: development foundation.** Render reports a separate API service configured from `main`, but API health, database connection, schema state, and secrets were not verified in the 16 November 2026 audit. The static storefront remains a separate preview and is not connected to the API. No live payments or shipments.
 
 ## Implemented in source
 - PostgreSQL tables: users, categories, products, orders, items, sessions, supplier purchases, shipments
@@ -18,7 +17,7 @@ The public Render service remains a static storefront demo. No live payments or 
 2. Execute `database/schema.sql` on a dedicated empty database.
 3. In `backend/`, run `npm install`.
 4. Set `DATABASE_URL` as an environment variable, then `npm start`.
-5. Test `GET /api/health` and `GET /api/products`.
+5. Run `npm test`, then test `GET /api/health` and `GET /api/products`.
 
 ## Required before public deployment
 - Deploy backend as a separate private-configured Render web service with a persistent database.

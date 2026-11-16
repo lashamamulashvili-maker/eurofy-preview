@@ -5,8 +5,8 @@ These items need owner credentials, contracts or decisions. They are **not compl
 - [ ] Confirm EUROFY legal business entity, country of establishment, business address and customer support contacts.
 - [ ] Decide consumer terms, returns, customs/VAT, duties, shipping regions and estimated delivery time with appropriate professional advice.
 - [ ] Obtain and connect EUROFY.ge domain; set DNS.
-- [ ] Approve separate Render staging API service and PostgreSQL instance; choose a paid persistent plan and backup policy.
-- [ ] Set server-only DATABASE_URL, API origins and secure secrets in Render environment settings.
+- [ ] Review existing Render API and PostgreSQL resources, confirm service health/schema/connection, and choose a retention/backup plan. The current free database is reported to expire on 15 December 2026.
+- [ ] Confirm server-only DATABASE_URL, exact API origins and secure secrets in Render settings without exposing secret values.
 - [ ] Select verified email delivery service and sender domain for transactional messages.
 - [ ] Open merchant account with payment provider supporting Georgia; obtain test credentials first.
 - [ ] Obtain supplier API/merchant permissions where available (Amazon/eBay etc.). Never scrape accounts in violation of terms.
@@ -19,4 +19,5 @@ These items need owner credentials, contracts or decisions. They are **not compl
 ## What is already available
 - GitHub repo: https://github.com/lashamamulashvili-maker/eurofy-preview
 - Public demo: https://eurofy-preview.onrender.com
-- Existing Render service is **static only**. New backend source in repo is not live.
+- Render reports a public static preview, a separate API web service, and a free PostgreSQL instance. Their runtime health, database connection/schema, and backup status still require verification.
+- Both EUROFY Render services currently deploy from `main`; the isolated feature branch is not their configured source branch.

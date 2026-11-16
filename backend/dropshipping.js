@@ -20,12 +20,15 @@ export function validateSupplierOffer(input) {
   return {supplierId:supplierId.trim(),supplierSku:supplierSku.trim(),title:title.trim(),currencyCode,costMinor,shippingMinor,stock,authorizedForResale:true,imageRightsConfirmed:imageRightsConfirmed===true};
 }
 export function calculateRetailQuote({costMinor,shippingMinor,handlingMinor=0,customsEstimateMinor=0,marginBps,fxNumerator=1,fxDenominator=1}) {
-  const base=money(costMinor,'costMinor')+money(shippingMinor,'shippingMinor')+money(handlingMinor,'handlingMinor')+money(customsEstimateMinor,'customsEstimateMinor');
+  const base=BigInt(money(costMinor,'costMinor'))+BigInt(money(shippingMinor,'shippingMinor'))+BigInt(money(handlingMinor,'handlingMinor'))+BigInt(money(customsEstimateMinor,'customsEstimateMinor'));
   if (![marginBps,fxNumerator,fxDenominator].every(Number.isSafeInteger) || marginBps<0 || marginBps>=10000 || fxNumerator<=0 || fxDenominator<=0) throw new RangeError('Invalid margin or exchange-rate ratio');
-  const costTarget=Math.ceil(base*fxNumerator/fxDenominator);
-  const retailMinor=Math.ceil(costTarget*10000/(10000-marginBps));
-  if (!Number.isSafeInteger(retailMinor)) throw new RangeError('Price overflow');
-  return {estimatedCostMinor:costTarget,retailMinor,estimatedMarginMinor:retailMinor-costTarget,indicative:true,requiresLiveStockCheck:true,requiresShippingAndTaxConfirmation:true};
+  const fxNumeratorBig=BigInt(fxNumerator), fxDenominatorBig=BigInt(fxDenominator);
+  const costTarget=(base*fxNumeratorBig+fxDenominatorBig-1n)/fxDenominatorBig;
+  const marginDenominator=BigInt(10000-marginBps);
+  const retail=(costTarget*10000n+marginDenominator-1n)/marginDenominator;
+  if (costTarget>BigInt(Number.MAX_SAFE_INTEGER) || retail>BigInt(Number.MAX_SAFE_INTEGER)) throw new RangeError('Price overflow');
+  const estimatedCostMinor=Number(costTarget), retailMinor=Number(retail);
+  return {estimatedCostMinor,retailMinor,estimatedMarginMinor:retailMinor-estimatedCostMinor,indicative:true,requiresLiveStockCheck:true,requiresShippingAndTaxConfirmation:true};
 }
 export function createDraftSupplierOrder({offer,quantity,customerOrderId}) {
   const item=validateSupplierOffer(offer);
