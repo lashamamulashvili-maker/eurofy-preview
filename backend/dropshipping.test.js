@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {validateSupplierOffer,calculateRetailQuote,createDraftSupplierOrder} from './dropshipping.js';
+const offer={supplierId:'supplier-a',supplierSku:'SKU-1',title:'Test product',currencyCode:'EUR',costMinor:1000,shippingMinor:200,stock:3,authorizedForResale:true,imageRightsConfirmed:false};
+test('supplier offer requires explicit resale rights',()=>{assert.throws(()=>validateSupplierOffer({...offer,authorizedForResale:false}));});
+test('image rights are separately tracked',()=>{assert.equal(validateSupplierOffer(offer).imageRightsConfirmed,false);});
+test('retail quote includes costs and margin',()=>{const q=calculateRetailQuote({costMinor:1000,shippingMinor:200,marginBps:2000});assert.equal(q.retailMinor,1500);assert.equal(q.requiresLiveStockCheck,true);});
+test('no supplier purchase occurs when preparing an order',()=>{const d=createDraftSupplierOrder({offer,quantity:2,customerOrderId:'EF-TEST'});assert.equal(d.supplierOrderSubmitted,false);assert.equal(d.paymentInitiated,false);});
+test('reject unavailable inventory',()=>{assert.throws(()=>createDraftSupplierOrder({offer,quantity:4,customerOrderId:'EF-TEST'}));});
+test('reject invalid margin',()=>{assert.throws(()=>calculateRetailQuote({costMinor:1000,shippingMinor:0,marginBps:10000}));});
