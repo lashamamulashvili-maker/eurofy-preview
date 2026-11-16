@@ -67,3 +67,9 @@ See [HYBRID-FULFILLMENT.md](HYBRID-FULFILLMENT.md) for the implementation plan a
 
 - Final read-only Render metadata check: `eurofy-preview-db` is available, unsuspended, PostgreSQL 17, free plan, expiry 15 December 2026. Read-only SQL remains blocked by the empty IP allowlist. No Render setting or database was changed.
 - Mission 4 code batch commit `5f61916bac2deea696d4ddf99c29b308ea2bf165` was created on GitHub's development branch. Its tree hash matched the locally verified tree; the branch was fetched read-only and the local development/tracking refs now point to that exact remote commit. No main-branch update was made.
+# Mission 6 — category/import foundation batch (16 November 2026)
+
+- Starting baseline: `1fc30e36cef48e6579166614ffd568852a141276` on `feature/eurofy-dropshipping-foundation`; clean before this batch. Pre-edit backup is `/workspace/scratch/backups/eurofy-m6-pre-edit-20261116T184135Z.tar.gz`, SHA-256 `a9684ef90cb8d3eccfe0b9b4760c4857e904454943c7f820a30a6b64fa8d4423`.
+- Added additive migration `20261116_004_category_supplier_architecture.sql`: 15 stable slugs, ka/en/uk names, editable descriptions/order/publication fields, subcategory table, product subcategory assignment, supplier external-category mapping records and review indexes. Existing categories are upserted by slug. No supplier inventory, authorization or imagery was fabricated.
+- Expanded migration tests to check all 15 category records, translations, and supplier/subcategory mapping tables. `npm test` passed 35/35; local `npm run migrate:pglite` applied migration 004 and skipped prior checksum-verified migrations.
+- This batch is database foundation only. Storefront navigation and admin CRUD/import preview are not yet implemented. Mission 5 admin/product-prep localization and informational pages remain outstanding.

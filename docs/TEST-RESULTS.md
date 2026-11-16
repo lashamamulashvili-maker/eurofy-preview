@@ -82,3 +82,11 @@ The persistent `.eurofy-data/` archive was verified with `gzip -t`, restored int
 Post-development source checkpoint: `/workspace/scratch/backups/eurofy-m4-source-checkpoint-20261116T181320Z.tar.gz`, SHA-256 `941c5ba4fb13938fd414e3145fe9b42758ded94c73c172da8bf4dbc45f75bbdf`. Post-migration PGlite checkpoint: `/workspace/scratch/backups/eurofy-m4-db-checkpoint-20261116T181320Z.tar.gz`, SHA-256 `b20bedb155fa815b9f170e8d95da890d7788af39e89b74a997aadde92a5469b8`.
 
 One early targeted test failed because its invalid-address fixture contained a valid seven-digit phone number; the fixture was corrected. One syntax-check attempt was run from `backend/` and referenced the storefront at the wrong relative path; it was rerun successfully from the repository root. These were harness/setup errors, not unresolved test failures.
+## Mission 6 category foundation — 16 November 2026
+
+| Check | Result | Scope |
+|---|---|---|
+| `npm test` in `backend/` | PASS, 35/35 | Full current backend suite, including additive migration data assertions |
+| `npm run migrate:pglite` | PASS | Applied migration 004 to local persistent PGlite; earlier three checksum-verified migrations skipped |
+| Category seed | PASS in migration integration test | 15 stable slugs with English/Ukrainian labels; Georgian remains default name |
+| Existing data preservation | PASS in migration integration test | Existing demo product preserved by migration fixture |
