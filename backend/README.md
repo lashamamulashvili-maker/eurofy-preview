@@ -29,6 +29,8 @@ Create a dedicated local database, apply `database/schema.sql` from the reposito
 
 ## Local backup and restore
 
+Owner-oriented macOS source setup, safe restore commands, backup instructions, and the current machine-access boundary are in [`../docs/MACOS-RESTORE.md`](../docs/MACOS-RESTORE.md).
+
 For embedded PGlite, stop the app first, then from the repository root run `mkdir -p backups && tar -czf backups/eurofy-pglite-$(date -u +%Y%m%dT%H%M%SZ).tar.gz .eurofy-data && gzip -t backups/eurofy-pglite-*.tar.gz`. To verify recovery, extract one archive to a new directory with `mkdir -p /tmp/eurofy-restore && tar -xzf backups/ARCHIVE.tar.gz -C /tmp/eurofy-restore`, then run `EUROFY_LOCAL_DB_DIR=/tmp/eurofy-restore/.eurofy-data node backend/migrate.js --pglite`; it should report migrations skipped after checksum validation. Do not extract over the primary local database.
 
 For standard local PostgreSQL, run the following from the repository root with a loopback `DATABASE_URL`; keep backup files out of Git:

@@ -13,6 +13,12 @@ The eleven information routes are available in local preview as informational/pr
 
 **Assessment date: 16 November 2026. Status: NOT READY for production commerce.**
 
+### Mission 6 update — 16 November 2026
+
+Migration 006 and a local admin-only supplier-import preview workflow are implemented and covered by the 37/37 backend suite. Preview jobs, item validation and audit history persist locally; admin review cannot publish a product, update price/stock, or submit a supplier order. Database migration and separate-archive restore checks passed. The import code is an offline compatibility scaffold, not a Syncee integration.
+
+The local information pages (11 routes), category database/UI and contact inbox remain pre-launch features. Legal pages that need verified operator details or counsel remain drafts. **Platform-wide language completeness has not been achieved:** the storefront and information pages have Georgian/English/Ukrainian resources, but the admin and product-preparation tools still contain Georgian-only or mixed text and API validation errors are mostly English. No desktop/mobile browser visual QA was completed. Production and public deployment remain blocked.
+
 | Area | Status | Evidence / remaining requirement |
 |---|---|---|
 | Brand and preview UI | Present | Approved EUROFY logo and family banner are in the branch; storefront remains a clearly labeled preview. Recheck on real devices. |

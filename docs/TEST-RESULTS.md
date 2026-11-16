@@ -1,3 +1,16 @@
+## Mission 6 supplier-import simulation — 16 November 2026
+
+| Check | Result | Scope |
+|---|---|---|
+| `npm test` in `backend/` | PASS, 37/37 | Full existing suite; integration includes admin-only import preview/review, staged duplicate detection, no-publication response and idempotent review denial |
+| `node --check backend/server.js` | PASS | API syntax |
+| `npm run migrate:pglite` | PASS | Applied additive migration 006 locally; migrations 001–005 checksum-skipped |
+| Pre-migration DB backup restore | PASS | Restored separate archive, applied migration 006, prior migration checksums verified |
+| Post-migration DB backup restore | PASS | Reopened separate restored copy; all six migration records verified; 0 mock import jobs present |
+| Browser desktop/mobile visual QA | NOT RUN | No browser-driven E2E was available in this execution environment |
+
+Backups: source `/workspace/scratch/backups/eurofy-m6-final-pre-20261116T192414Z.tar.gz` (SHA-256 `39208201803fad688d4500e14f4c4cee3682fb1c262ec7749b7b9ca2fa8aa414`); pre-migration database `/workspace/scratch/backups/eurofy-m6-db-pre-import-20261116T193300Z.tar.gz` (SHA-256 `64a89544510220456cea6a1ef1b469ae6e0259e77e93ad4d63563a176b4e82d0`); post-migration database `/workspace/scratch/backups/eurofy-m6-db-checkpoint-20261116T194100Z.tar.gz` (SHA-256 `5fc053d6d78c46c1981e70ae16e00baba291deb30775a7c687bd7a44399977f2`). Each archive passed `gzip -t`; database archives were separately restored and opened.
+
 ## Mission 6 contact and informational pages — 16 November 2026
 
 | Check | Result | Scope |

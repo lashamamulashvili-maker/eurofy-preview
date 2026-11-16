@@ -1,3 +1,12 @@
+# Mission 6 remaining work — 16 November 2026
+
+1. Complete real admin localization in Georgian, English and Ukrainian for `admin.html`, `product-prep.html`, dynamic labels, validation, and backend error messages; test missing keys and locale persistence.
+2. Add browser-driven desktop/mobile QA for category filters, paging/sorting, supplier import preview, contact inbox and all information pages.
+3. Extend the local supplier catalog review only when there is verified product-level resale authority, image rights, exact route permissions and current cost/stock evidence. The current preview is a staging/audit tool and is deliberately incapable of publishing or syncing stock/prices.
+4. Obtain Syncee’s official API documentation, manual activation, fees and written supplier permissions before implementing any real adapter. Confirm separately direct shipping to Georgia and EU delivery plus onward export.
+5. Obtain qualified legal/tax review and verified operator details before publishing AGB, Impressum, privacy, customs, shipping, returns or payment policies.
+6. Finish local accessibility/security review, order-to-fulfillment transaction binding, backup policy and production architecture review. Keep all external commerce features disabled until separately authorized.
+
 ## Mission 5 outstanding localization work
 
 1. Localize `admin.html` and `product-prep.html` in Georgian, English, and Ukrainian, including dynamic prompts/statuses and accessible labels.

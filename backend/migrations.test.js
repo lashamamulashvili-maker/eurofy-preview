@@ -20,8 +20,8 @@ test('hybrid migration preserves existing demo data and creates route-specific s
     const productId=inserted.rows[0].id;
     const first=await runMigrations(db,migrationDirectory);
     const second=await runMigrations(db,migrationDirectory);
-    assert.deepEqual(first.applied,['20261116_001_hybrid_fulfillment.sql','20261116_002_order_request_idempotency.sql','20261116_003_order_operations.sql','20261116_004_category_supplier_architecture.sql','20261116_005_contact_messages.sql']);
-    assert.deepEqual(second.skipped,['20261116_001_hybrid_fulfillment.sql','20261116_002_order_request_idempotency.sql','20261116_003_order_operations.sql','20261116_004_category_supplier_architecture.sql','20261116_005_contact_messages.sql']);
+    assert.deepEqual(first.applied,['20261116_001_hybrid_fulfillment.sql','20261116_002_order_request_idempotency.sql','20261116_003_order_operations.sql','20261116_004_category_supplier_architecture.sql','20261116_005_contact_messages.sql','20261116_006_supplier_import_simulation.sql']);
+    assert.deepEqual(second.skipped,['20261116_001_hybrid_fulfillment.sql','20261116_002_order_request_idempotency.sql','20261116_003_order_operations.sql','20261116_004_category_supplier_architecture.sql','20261116_005_contact_messages.sql','20261116_006_supplier_import_simulation.sql']);
 
     const product=await db.query('SELECT is_active,publication_status FROM products WHERE id=$1',[productId]);
     assert.equal(product.rows[0].is_active,true);
@@ -35,6 +35,8 @@ test('hybrid migration preserves existing demo data and creates route-specific s
     assert.ok(categories.rows.every(row=>row.name_en&&row.name_uk));
     assert.ok(names.has('eurofy_subcategories'));
     assert.ok(names.has('eurofy_supplier_category_mappings'));
+    for(const name of ['eurofy_supplier_imports','eurofy_supplier_import_items','eurofy_supplier_import_audit'])assert.ok(names.has(name),`missing table ${name}`);
+    const importColumns=await db.query("SELECT column_name FROM information_schema.columns WHERE table_name='eurofy_supplier_products'");assert.ok(importColumns.rows.some(row=>row.column_name==='external_product_id'));
   } finally { await db.close(); }
 });
 
@@ -46,7 +48,7 @@ test('migration runner rejects modified applied migration checksums',async()=>{
     await writeFile(path.join(temp,'20261116_001_hybrid_fulfillment.sql'),'SELECT 1;\n');
     await assert.rejects(runMigrations(db,temp),/Applied migration was modified/);
     const applied=await db.query('SELECT count(*)::int AS count FROM eurofy_schema_migrations');
-    assert.equal(applied.rows[0].count,5);
+    assert.equal(applied.rows[0].count,6);
   } finally { await db.close(); await rm(temp,{recursive:true,force:true}); }
 });
 

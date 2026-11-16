@@ -8,6 +8,7 @@ import {spawn} from 'node:child_process';
 import net from 'node:net';
 import {once} from 'node:events';
 import {PGlite} from '@electric-sql/pglite';
+import bcrypt from 'bcryptjs';
 import {pgcrypto} from '@electric-sql/pglite/contrib/pgcrypto';
 import {runMigrations} from './migration-runner.js';
 
@@ -24,8 +25,13 @@ test('local HTTP storefront serves verified catalog and authenticated persistent
     await db.exec(await readFile(path.join(root,'database/schema.sql'),'utf8'));
     await runMigrations(db,path.join(root,'database/migrations'));
     const category=(await db.query("INSERT INTO categories(name_ka,slug,name_en,name_uk,is_published) VALUES('ტესტი','integration-test','Test','Тест',true) RETURNING id")).rows[0];
+    const otherCategory=(await db.query("INSERT INTO categories(name_ka,slug,name_en,name_uk,is_published) VALUES('სხვა','integration-other','Other','Інше',true) RETURNING id")).rows[0];
+    const foreignSubcategory=(await db.query("INSERT INTO eurofy_subcategories(category_id,slug,name_ka,name_en,name_uk,is_published) VALUES($1,'foreign-sub','ქვეტესტი','Sub test','Підтест',true) RETURNING id",[otherCategory.id])).rows[0];
     const product=(await db.query("INSERT INTO products(category_id,title_ka,description_ka,price_gel_minor,image_url,is_active,publication_status) VALUES($1,'API ტესტ პროდუქტი','მომწოდებლის მიერ დადასტურებული',12500,'https://images.example.invalid/api-test.jpg',true,'published') RETURNING id",[category.id])).rows[0];
     const supplier=(await db.query("INSERT INTO eurofy_suppliers(supplier_code,display_name,provider_type,enabled,resale_authorized,resale_evidence_ref,terms_verified_at,direct_ship_countries) VALUES('API-MOCK','API Mock Supplier','mock',true,true,'contract:test',now(),ARRAY['GE']) RETURNING id")).rows[0];
+    const adminHash=await bcrypt.hash('development-admin-password-123',4);
+    await db.query("INSERT INTO users(email,password_hash,full_name,role) VALUES('admin-test@example.invalid',$1,'Integration Admin','admin')",[adminHash]);
+    const supplierCategory=(await db.query("INSERT INTO eurofy_supplier_category_mappings(supplier_id,external_category_id,external_category_name,category_id,status) VALUES($1,'mock-cat','Mock Category',$2,'mapped') RETURNING id",[supplier.id,category.id])).rows[0];
     const offer=(await db.query("INSERT INTO eurofy_supplier_products(supplier_id,product_id,supplier_sku,currency_code,supplier_price_minor,authorized_for_resale,authorization_evidence_ref,direct_shipping_enabled,direct_ship_countries,terms_verified_at) VALUES($1,$2,'API-SKU','EUR',3000,true,'rights:test',true,ARRAY['GE'],now()) RETURNING id",[supplier.id,product.id])).rows[0];
     const now=new Date().toISOString(),expires=new Date(Date.now()+3600000).toISOString();
     await db.query("INSERT INTO eurofy_inventory_snapshots(supplier_product_id,availability,quantity,source,checked_at,stale_after) VALUES($1,'in_stock',3,'mock',$2,$3)",[offer.id,now,expires]);
@@ -44,7 +50,7 @@ test('local HTTP storefront serves verified catalog and authenticated persistent
     const badContact=await fetch(base+'/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'A',email:'bad',subject:'Help',message:'short'})});assert.equal(badContact.status,400);
     const contact=await fetch(base+'/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Test sender',email:'sender@example.invalid',subject:'Question',message:'Please tell me about the pre-launch store.'})});assert.equal(contact.status,201);const contactBody=await contact.json();assert.equal(contactBody.delivery,'stored-for-admin-review-not-emailed');
 
-    const publicCategories=await fetch(base+'/api/categories');assert.equal(publicCategories.status,200);const categoryData=await publicCategories.json();assert.equal(categoryData.categories.length,16);assert.ok(categoryData.categories.some(c=>c.slug==='fashion'));assert.ok(categoryData.categories.every(c=>Number.isInteger(c.product_count)&&c.name_en&&c.name_uk));
+    const publicCategories=await fetch(base+'/api/categories');assert.equal(publicCategories.status,200);const categoryData=await publicCategories.json();assert.equal(categoryData.categories.length,17);assert.ok(categoryData.categories.some(c=>c.slug==='fashion'));assert.ok(categoryData.categories.every(c=>Number.isInteger(c.product_count)&&c.name_en&&c.name_uk));
     const publicSubcategories=await fetch(base+'/api/categories/fashion/subcategories');assert.equal(publicSubcategories.status,200);assert.deepEqual((await publicSubcategories.json()).subcategories,[]);
     const home=await fetch(base+'/');assert.equal(home.status,200);assert.match(await home.text(),/EUROFY/);const info=await fetch(base+'/info.html');assert.equal(info.status,200);assert.match(await info.text(),/Supplier Partnership/);
     assert.equal((await fetch(base+'/backend/server.js')).status,404);
@@ -53,6 +59,7 @@ test('local HTTP storefront serves verified catalog and authenticated persistent
     const reg=await fetch(base+'/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'cart-test@example.invalid',password:'development-password-123',fullName:'Cart Integration',phone:'+995555000000',address:'Test Street 1',city:'Tbilisi'})});assert.equal(reg.status,201);
     const login=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'cart-test@example.invalid',password:'development-password-123'})});assert.equal(login.status,200);const {token}=await login.json();
     const auth={Authorization:'Bearer '+token,'Content-Type':'application/json'};
+    const adminLogin=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'admin-test@example.invalid',password:'development-admin-password-123'})});assert.equal(adminLogin.status,200);const adminToken=(await adminLogin.json()).token;const adminAuth={Authorization:'Bearer '+adminToken,'Content-Type':'application/json'};
     const address=await fetch(base+'/api/addresses',{method:'POST',headers:auth,body:JSON.stringify({label:'სახლი',recipientName:'Cart Integration',phone:'+995555000000',addressLine1:'Test Street 1',city:'Tbilisi',postalCode:'0101',isDefault:true})});assert.equal(address.status,201);const savedAddress=(await address.json()).address;assert.equal(savedAddress.country_code,'GE');
     const addresses=await fetch(base+'/api/addresses',{headers:{Authorization:'Bearer '+token}});assert.equal((await addresses.json()).addresses.length,1);
     const addressUpdate=await fetch(base+'/api/addresses/'+savedAddress.id,{method:'PATCH',headers:auth,body:JSON.stringify({label:'სამსახური',city:'Kutaisi'})});assert.equal(addressUpdate.status,200);assert.equal((await addressUpdate.json()).address.city,'Kutaisi');
@@ -74,6 +81,16 @@ test('local HTTP storefront serves verified catalog and authenticated persistent
     assert.equal((await fetch(base+'/api/admin/subcategories',{headers:auth})).status,403);
     assert.equal((await fetch(base+'/api/admin/supplier-category-mappings',{headers:auth})).status,403);
     assert.equal((await fetch(base+'/api/admin/contact-messages',{headers:auth})).status,403);
+    assert.equal((await fetch(base+'/api/admin/supplier-imports',{headers:auth})).status,403);
+    const invalidMapping=await fetch(base+'/api/admin/supplier-category-mappings',{method:'POST',headers:adminAuth,body:JSON.stringify({supplierId:supplier.id,externalCategoryId:'invalid-parent-map',externalCategoryName:'Wrong parent',categoryId:category.id,subcategoryId:foreignSubcategory.id})});assert.equal(invalidMapping.status,400);
+    const adminMappings=await fetch(base+'/api/admin/supplier-category-mappings',{headers:{Authorization:'Bearer '+adminToken}});assert.equal((await adminMappings.json()).mappings.length,1);
+    const importItem={externalProductId:'mock-feed-product-001',sku:'MOCK-FEED-001',title:'Offline mock product',priceMinor:1499,currency:'EUR',stockQuantity:3,imageUrl:'https://images.example.invalid/mock.jpg',externalCategoryId:'mock-cat',imageRightsReviewed:true,imageRightsEvidence:'admin-reviewed-fixture',fulfillmentClaim:'direct'};
+    const importPreview=await fetch(base+'/api/admin/supplier-imports/preview',{method:'POST',headers:adminAuth,body:JSON.stringify({supplierId:supplier.id,sourceLabel:'Offline test fixture',items:[importItem]})});assert.equal(importPreview.status,201);const previewBody=await importPreview.json();assert.equal(previewBody.mode,'offline_mock');assert.equal(previewBody.counts.valid,1);assert.equal(previewBody.items[0].validationStatus,'ready_for_review');assert.equal(previewBody.items[0].simulatedAction,'would_create_draft');
+    const importList=await fetch(base+'/api/admin/supplier-imports',{headers:{Authorization:'Bearer '+adminToken}});assert.equal(importList.status,200);assert.equal((await importList.json()).imports.length,1);
+    const repeatedImport=await fetch(base+'/api/admin/supplier-imports/preview',{method:'POST',headers:adminAuth,body:JSON.stringify({supplierId:supplier.id,sourceLabel:'Repeat offline fixture',items:[importItem]})});assert.equal(repeatedImport.status,201);const repeatedBody=await repeatedImport.json();assert.equal(repeatedBody.counts.duplicates,1);assert.equal(repeatedBody.items[0].validationStatus,'duplicate');
+    const reviewImport=await fetch(base+'/api/admin/supplier-imports/'+previewBody.importId+'/review',{method:'PATCH',headers:adminAuth,body:JSON.stringify({status:'reviewed'})});assert.equal(reviewImport.status,200);const reviewedBody=await reviewImport.json();assert.equal(reviewedBody.published,false);assert.equal(reviewedBody.supplierOrderCreated,false);
+    const repeatedReview=await fetch(base+'/api/admin/supplier-imports/'+previewBody.importId+'/review',{method:'PATCH',headers:adminAuth,body:JSON.stringify({status:'reviewed'})});assert.equal(repeatedReview.status,404);
+    const unchangedProductCount=await fetch(base+'/api/products?q=Offline%20mock',{headers:{Authorization:'Bearer '+adminToken}});assert.equal((await unchangedProductCount.json()).pagination.total,0);
     const forbiddenHybridAdmin=await fetch(base+'/api/admin/hybrid-fulfillments',{headers:{Authorization:'Bearer '+token}});assert.equal(forbiddenHybridAdmin.status,403);
     const addressDelete=await fetch(base+'/api/addresses/'+savedAddress.id,{method:'DELETE',headers:{Authorization:'Bearer '+token}});assert.equal(addressDelete.status,204);
     const altered=await fetch(base+'/api/orders',{method:'POST',headers:{...auth,'Idempotency-Key':'integration-order-0001'},body:JSON.stringify({...orderBody,deliveryAddress:'Different address 2'})});assert.equal(altered.status,409);
