@@ -1,5 +1,9 @@
 # EUROFY supplier integration status
 
+## Mission 7 local supplier-permission and import controls
+
+Admin users can create disabled supplier records and record evidence references for resale, direct shipment to Georgia, EU delivery, and onward export. Changes are validated, stored transactionally and audited. Offline import previews check those independent permissions, a category mapping, image-rights review and item shape. Duplicate items are flagged. Preview/review does not create a product, publish inventory, apply a price/stock update, or place an order. Migration 007 stores supplier permission evidence fields and audit records. These controls are preparation only; entered evidence must be independently verified before use. Syncee stays offline/mock until activation and terms are authorized.
+
 ## Integration boundary
 
 Supplier adapters must be offline/mock by default. Import only supplier data EUROFY is authorized to use. Never scrape product pages or reuse catalog text/images without written rights. A feed/API response is not itself proof of resale authorization, image rights, delivery availability, or accurate stock.

@@ -1,3 +1,20 @@
+## Mission 7 verification — 16 November 2026
+
+| Check | Result |
+|---|---|
+| Full backend suite (`cd backend && npm test`) | PASS — 41/41, 0 failed |
+| Focused localization suite | PASS — 6/6 |
+| Supplier admin integration | PASS — role denial, default-disabled supplier, resale evidence/date gate, update persistence/audit, direct route evidence, forwarding blocked without onward-export evidence and allowed only after evidence, import duplicate handling, preview-only behavior |
+| Translation/API integration | PASS — KA/UK validation output, CORS `Accept-Language`, exactly `ka/en/uk` selector, legacy `ru` preference maps to `uk` |
+| Migration checks | PASS — additive 007 applied once; second run skipped all seven tracked migrations; restored pre-007 PGlite copy migrated successfully |
+| Post-migration backup restore | PASS — archive opened in a separate directory; 7/7 migration checksums skipped and supplier permission audit table verified |
+| JavaScript syntax | PASS — backend server, localized-errors module, admin locale script; inline UI files checked in relevant static/integration assertions |
+| `git diff --check` | PASS |
+| Local HTTP smoke | PASS — `/api/health`, `/`, `/admin.html`, `/product-prep.html`, `/info.html`, locale asset all HTTP 200 |
+| Playwright desktop/mobile | BLOCKED — Chromium aborted before page load (`socket() failed: Operation not permitted`) |
+
+No supplier catalog was published or synchronized. Tests use isolated mock data.
+
 ## Mission 6 supplier-import simulation — 16 November 2026
 
 | Check | Result | Scope |

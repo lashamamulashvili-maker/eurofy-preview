@@ -52,3 +52,16 @@ test('pre-launch information pages provide all required routes and three languag
   assert.match(html,/<option value="ka">ქართული/);assert.match(html,/<option value="en">English/);assert.match(html,/<option value="uk">Українська/);assert.doesNotMatch(html,/<option value="ru">/);
   assert.match(html,/not yet a registered business/);assert.match(html,/legal review required/);assert.match(html,/local development database/);assert.match(html,/It was not emailed/);
 });
+
+test('admin and product-preparation static UI text is translated in ka, en and uk with no Russian selector',async()=>{
+  const [admin,prep,locales]=await Promise.all(['admin.html','product-prep.html','assets/eurofy-admin-locales.js'].map(file=>readFile(path.join(root,file),'utf8')));
+  assert.match(admin,/assets\/eurofy-admin-locales\.js/);assert.match(prep,/assets\/eurofy-admin-locales\.js/);
+  assert.match(locales,/option value="ka">ქართული/);assert.match(locales,/option value="en">English/);assert.match(locales,/option value="uk">Українська/);assert.doesNotMatch(locales,/option value="ru"/);
+  const keys=new Set();for(const m of locales.matchAll(/\[`([^`]*)`,`([^`]*)`,`([^`]*)`\]|\['((?:\\.|[^'])*)','((?:\\.|[^']*)*)','((?:\\.|[^']*)*)'\]/g)){keys.add(m[1]??m[4]);}
+  for(const [file,html] of [['admin.html',admin],['product-prep.html',prep]]){
+    const visible=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,'');
+    const texts=[...visible.matchAll(/>([^<>]+)</g)].map(x=>x[1].replace(/&amp;/g,'&').replace(/&gt;/g,'>').replace(/&lt;/g,'<').replace(/\s+/g,' ').trim()).filter(Boolean);
+    for(const text of texts.filter(x=>/[\u10A0-\u10FF]/.test(x)))assert.ok(keys.has(text),`${file} untranslated static text: ${text}`);
+  }
+  assert.match(locales,/value==='ru'.*value='uk'/);assert.match(locales,/document\.documentElement\.lang=locale/);
+});

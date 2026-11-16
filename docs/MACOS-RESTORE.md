@@ -1,3 +1,5 @@
+Mission 7's latest verified source changes are intended for `feature/eurofy-dropshipping-foundation`. Isolated-runner checkpoints: `/workspace/scratch/backups/eurofy-m7-pre-edit-20261116T200000Z.tar.gz` (source before edits), `/workspace/scratch/backups/eurofy-m7-source-checkpoint-20261116T210000Z.tar.gz` (post-development source; extracted Git worktree verified), `/workspace/scratch/backups/eurofy-m7-pre-migration-db-20261116T201500Z.tar.gz` (PGlite before migration 007), and `/workspace/scratch/backups/eurofy-m7-post-migration-db-20261116T204200Z.tar.gz` (PGlite after migration 007). The post-migration archive was extracted separately and all seven migrations verified. These files are not on the owner's Mac. After the feature branch is pushed, fetch it using the commands below; do not deploy or merge to `main` as part of restoration.
+
 # EUROFY macOS restore and development
 
 These steps restore the feature-branch source on the owner’s Mac. The Mac was not accessed during the current isolated Linux session. The development database and source archives created here are in this session’s workspace; copy an archive to the Mac separately before using it there.

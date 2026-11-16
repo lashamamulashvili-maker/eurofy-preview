@@ -1,3 +1,11 @@
+# Mission 7 remaining work — 16 November 2026
+
+1. Re-run visual/mobile/accessibility QA on a machine where Chromium can launch; this container's Chromium aborts before loading pages due socket restrictions.
+2. Review all Georgian, English and Ukrainian admin, product-preparation, backend and informational copy with fluent reviewers. Automated key coverage is not a substitute for linguistic review.
+3. Keep supplier imports unpublished until each SKU has documented resale rights, licensed images, current price/stock evidence, and separately verified direct-to-Georgia or EU-plus-export permission. Obtain Syncee documentation/activation/terms before any real connector.
+4. Obtain professional German/EU and Georgian legal/tax/customs review and verified operator disclosures before finalizing legal pages.
+5. Finish order-to-fulfillment checkout binding, delivery quote selection, customer tracking, returns workflows and end-to-end browser coverage. Payments and supplier purchases remain disabled.
+
 # Mission 6 remaining work — 16 November 2026
 
 1. Complete real admin localization in Georgian, English and Ukrainian for `admin.html`, `product-prep.html`, dynamic labels, validation, and backend error messages; test missing keys and locale persistence.
@@ -7,13 +15,11 @@
 5. Obtain qualified legal/tax review and verified operator details before publishing AGB, Impressum, privacy, customs, shipping, returns or payment policies.
 6. Finish local accessibility/security review, order-to-fulfillment transaction binding, backup policy and production architecture review. Keep all external commerce features disabled until separately authorized.
 
-## Mission 5 outstanding localization work
+## Mission 5 localization follow-up
 
-1. Localize `admin.html` and `product-prep.html` in Georgian, English, and Ukrainian, including dynamic prompts/statuses and accessible labels.
-2. Localize backend validation/error responses, or add language-aware client error mapping with tests.
-3. Run desktop and mobile browser checks where browser automation can reach the local app.
-4. Extend translation tests to enumerate every active UI string and fail on missing Ukrainian values.
-5. Have Ukrainian legal/product content reviewed by a fluent professional before commercial use.
+1. Admin/product-preparation static UI and selected dynamic strings and API errors were localized in Mission 7; continue expanding automated coverage when new UI is added.
+2. Run desktop and mobile browser checks where Chromium can launch; this runner blocks its required socket call.
+3. Have Georgian, English and Ukrainian legal/product content reviewed by fluent professionals before commercial use.
 
 # EUROFY next steps
 
