@@ -69,6 +69,7 @@ test('local HTTP storefront serves verified catalog and authenticated persistent
     const forbiddenAdmin=await fetch(base+'/api/admin/orders',{headers:{Authorization:'Bearer '+token}});assert.equal(forbiddenAdmin.status,403);
     assert.equal((await fetch(base+'/api/admin/categories',{headers:auth})).status,403);
     assert.equal((await fetch(base+'/api/admin/subcategories',{headers:auth})).status,403);
+    assert.equal((await fetch(base+'/api/admin/supplier-category-mappings',{headers:auth})).status,403);
     const forbiddenHybridAdmin=await fetch(base+'/api/admin/hybrid-fulfillments',{headers:{Authorization:'Bearer '+token}});assert.equal(forbiddenHybridAdmin.status,403);
     const addressDelete=await fetch(base+'/api/addresses/'+savedAddress.id,{method:'DELETE',headers:{Authorization:'Bearer '+token}});assert.equal(addressDelete.status,204);
     const altered=await fetch(base+'/api/orders',{method:'POST',headers:{...auth,'Idempotency-Key':'integration-order-0001'},body:JSON.stringify({...orderBody,deliveryAddress:'Different address 2'})});assert.equal(altered.status,409);

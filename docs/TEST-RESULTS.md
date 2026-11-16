@@ -1,3 +1,11 @@
+## Mission 6 admin assignment/mapping API slice — 16 November 2026
+
+| Check | Result | Scope |
+|---|---|---|
+| `npm test` | PASS, 36/36 | Full suite including customer-denial on supplier mapping admin route |
+| Inline scripts and backend syntax | PASS | index, admin, product-prep, server |
+| `git diff --check` | PASS | Whitespace validation |
+
 ## Mission 6 storefront category controls — 16 November 2026
 
 | Check | Result | Scope |

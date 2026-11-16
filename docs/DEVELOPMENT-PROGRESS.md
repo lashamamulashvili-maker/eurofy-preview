@@ -1,3 +1,10 @@
+## Mission 6 — subcategory product assignment and supplier mapping API slice
+
+- Added a product-row subcategory selector in the admin UI. Saving uses the authenticated product PATCH route and the server verifies the subcategory belongs to the product's selected/current category.
+- Added admin-only supplier category mapping list and upsert endpoints. Inputs are validated, duplicate supplier/external-category IDs update the existing mapping, and the acting admin is recorded as reviewer. Ordinary customer role is denied by integration coverage.
+- Full backend suite passes 36/36; inline scripts and server syntax check pass.
+- Still outstanding: admin mapping review/import preview UI, supplier selector/manage workflow, complete admin and product-prep ka/en/uk translations, mock Syncee product import, legal/info pages and contact inbox.
+
 ## Mission 6 — storefront category controls (16 November 2026)
 
 - Connected storefront category browsing to the paginated API: query, stable category slug, active subcategory, page, page size 24, and allowed sort order are sent to the backend.
