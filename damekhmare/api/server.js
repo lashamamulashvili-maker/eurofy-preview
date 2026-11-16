@@ -23,7 +23,7 @@ async function auth(req,res,next){
  const token=/^Bearer ([a-f0-9]{64})$/.exec(req.get('authorization')||'')?.[1];
  const session=token&&sessions.get(hash(token));
  if(!session||session.expires<Date.now())return res.status(401).json({error:'Authentication required'});
- try{const {rows}=await pool.query('SELECT id,email,display_name,role_customer,role_provider,locale FROM dm_accounts WHERE id=$1',[session.userId]);if(!rows.length)return res.status(401).json({error:'Account not found'});req.account=rows[0];next()}catch{res.status(503).json({error:'Authentication unavailable'})}
+ try{const {rows}=await pool.query('SELECT id,email,display_name,role_customer,role_provider,locale,is_admin FROM dm_accounts WHERE id=$1',[session.userId]);if(!rows.length)return res.status(401).json({error:'Account not found'});req.account=rows[0];next()}catch{res.status(503).json({error:'Authentication unavailable'})}
 }
 app.get('/api/health',async(_req,res)=>{
  if(!pool)return res.json({ok:true,databaseConfigured:false});
