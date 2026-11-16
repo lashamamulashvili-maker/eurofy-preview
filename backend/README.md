@@ -14,10 +14,23 @@
 
 ## Local setup
 1. Install Node.js 20+ and PostgreSQL.
-2. Execute `database/schema.sql` on a dedicated empty database.
-3. In `backend/`, run `npm install`.
-4. Set `DATABASE_URL` as an environment variable, then `npm start`.
-5. Run `npm test`, then test `GET /api/health` and `GET /api/products`.
+2. Create a dedicated empty local database and apply `database/schema.sql` from the repository root: `createdb eurofy_local` then `psql postgresql://localhost/eurofy_local -v ON_ERROR_STOP=1 -f database/schema.sql`.
+3. In `backend/`, run `npm install` and `npm test`.
+4. Set `DATABASE_URL` to the local database URL, then run `npm start`. Stop it with Ctrl+C.
+5. Check `GET /api/health` and `GET /api/products` against local data.
+
+## Local backup and restore check
+
+Run these from the repository root with a local `DATABASE_URL`; keep backup files out of Git and do not use a production URL here:
+
+```sh
+mkdir -p backups
+pg_dump --format=custom --no-owner --file="backups/eurofy-local-$(date +%Y%m%d-%H%M%S).dump" "$DATABASE_URL"
+createdb eurofy_restore_check
+pg_restore --no-owner --dbname=eurofy_restore_check backups/eurofy-local-YYYYMMDD-HHMMSS.dump
+```
+
+Replace the final filename with the dump just created. Verify the restored database before relying on the backup. The restore example uses a separate database so it does not overwrite the source; the current project does not yet automate or schedule backups.
 
 ## Required before public deployment
 - Deploy backend as a separate private-configured Render web service with a persistent database.
