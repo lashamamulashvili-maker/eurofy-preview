@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {createServer} from 'node:http';import {app} from './server.js';
+async function serve(fn){const server=createServer(app);await new Promise(r=>server.listen(0,'127.0.0.1',r));try{await fn('http://127.0.0.1:'+server.address().port)}finally{await new Promise(r=>server.close(r))}}
+test('private dashboard routes reject unauthenticated access',async()=>serve(async base=>{for(const path of ['/api/my/requests','/api/my/offers','/api/provider/me']){const response=await fetch(base+path);assert.equal(response.status,401,path)}}));
