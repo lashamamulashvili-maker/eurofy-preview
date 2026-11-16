@@ -1,3 +1,11 @@
+## Mission 6 — local information pages and contact inbox slice
+
+- Added `info.html` with 11 navigable pages and ka/en/uk content: About, Contact, FAQ, Shipping, Returns, Payment, Cookies, Privacy, Terms/AGB, Impressum, Supplier Partnership. Store footer links to each page. Legal/contract pages display draft/legal-review notices; no company registration/address/VAT details or supplier relationships are invented. EUROFY pre-launch status and disabled live operations are explicit.
+- Contact form posts validated messages to local database table `eurofy_contact_messages`, has a honeypot and 5/hour rate limit, and states that email delivery is not configured. Admin-only inbox lists messages and allows reviewed/closed status changes. No raw IP is persisted.
+- Added additive migration 005; applied locally with migrations 001–004 checksum-skipped. Integration coverage verifies validation, persistence response, and ordinary-customer denial from admin inbox.
+- Full suite passes 37/37; inline JS, server syntax, and diff checks pass. Browser visual testing remains unavailable.
+- Remaining: admin/product-prep are still mainly Georgian; supplier mapping has API but no review/import UI; no actual Syncee adapter/docs-based API; storefronts still need fully verified responsive browser test; legal drafts require counsel and operator details.
+
 ## Mission 6 — subcategory product assignment and supplier mapping API slice
 
 - Added a product-row subcategory selector in the admin UI. Saving uses the authenticated product PATCH route and the server verifies the subcategory belongs to the product's selected/current category.

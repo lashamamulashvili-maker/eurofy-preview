@@ -1,3 +1,13 @@
+## Mission 6 contact and informational pages — 16 November 2026
+
+| Check | Result | Scope |
+|---|---|---|
+| `npm test` | PASS, 37/37 | Full suite includes contact validation/persistence, admin inbox authorization, information-page content smoke tests and migrations |
+| `npm run migrate:pglite` | PASS | Applied migration 005 locally; earlier migrations checksum-skipped |
+| Inline JS and backend syntax | PASS | storefront, admin, product-prep, info pages, server |
+| `git diff --check` | PASS | Patch whitespace |
+| Desktop/mobile browser QA | NOT RUN | Local browser automation unavailable |
+
 ## Mission 6 admin assignment/mapping API slice — 16 November 2026
 
 | Check | Result | Scope |

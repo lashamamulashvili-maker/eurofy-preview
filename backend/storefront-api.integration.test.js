@@ -41,9 +41,12 @@ test('local HTTP storefront serves verified catalog and authenticated persistent
     let health;
     for(let i=0;i<120;i++){if(child.exitCode!==null)throw Error('API exited early: '+logs);try{health=await fetch(base+'/api/health');if(health.ok)break}catch{}await new Promise(r=>setTimeout(r,250));}
     assert.equal(health?.status,200,'API did not become ready: '+logs);
+    const badContact=await fetch(base+'/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'A',email:'bad',subject:'Help',message:'short'})});assert.equal(badContact.status,400);
+    const contact=await fetch(base+'/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Test sender',email:'sender@example.invalid',subject:'Question',message:'Please tell me about the pre-launch store.'})});assert.equal(contact.status,201);const contactBody=await contact.json();assert.equal(contactBody.delivery,'stored-for-admin-review-not-emailed');
+
     const publicCategories=await fetch(base+'/api/categories');assert.equal(publicCategories.status,200);const categoryData=await publicCategories.json();assert.equal(categoryData.categories.length,16);assert.ok(categoryData.categories.some(c=>c.slug==='fashion'));assert.ok(categoryData.categories.every(c=>Number.isInteger(c.product_count)&&c.name_en&&c.name_uk));
     const publicSubcategories=await fetch(base+'/api/categories/fashion/subcategories');assert.equal(publicSubcategories.status,200);assert.deepEqual((await publicSubcategories.json()).subcategories,[]);
-    const home=await fetch(base+'/');assert.equal(home.status,200);assert.match(await home.text(),/EUROFY/);
+    const home=await fetch(base+'/');assert.equal(home.status,200);assert.match(await home.text(),/EUROFY/);const info=await fetch(base+'/info.html');assert.equal(info.status,200);assert.match(await info.text(),/Supplier Partnership/);
     assert.equal((await fetch(base+'/backend/server.js')).status,404);
     const catalog=await fetch(base+'/api/products?q=API&page=1&limit=1&sort=price_asc');assert.equal(catalog.status,200);const catalogBody=await catalog.json(),listed=catalogBody.products;assert.equal(listed.length,1);assert.equal(listed[0].id,product.id);assert.equal(listed[0].price_gel_minor,12500);assert.deepEqual(catalogBody.pagination,{page:1,limit:1,total:1,pages:1});assert.equal((await fetch(base+'/api/products?sort=invalid')).status,400);
     const preflight=await fetch(base+'/api/cart/items/'+product.id,{method:'OPTIONS',headers:{Origin:base,'Access-Control-Request-Method':'PUT','Access-Control-Request-Headers':'authorization,content-type'}});assert.equal(preflight.status,204);
@@ -70,6 +73,7 @@ test('local HTTP storefront serves verified catalog and authenticated persistent
     assert.equal((await fetch(base+'/api/admin/categories',{headers:auth})).status,403);
     assert.equal((await fetch(base+'/api/admin/subcategories',{headers:auth})).status,403);
     assert.equal((await fetch(base+'/api/admin/supplier-category-mappings',{headers:auth})).status,403);
+    assert.equal((await fetch(base+'/api/admin/contact-messages',{headers:auth})).status,403);
     const forbiddenHybridAdmin=await fetch(base+'/api/admin/hybrid-fulfillments',{headers:{Authorization:'Bearer '+token}});assert.equal(forbiddenHybridAdmin.status,403);
     const addressDelete=await fetch(base+'/api/addresses/'+savedAddress.id,{method:'DELETE',headers:{Authorization:'Bearer '+token}});assert.equal(addressDelete.status,204);
     const altered=await fetch(base+'/api/orders',{method:'POST',headers:{...auth,'Idempotency-Key':'integration-order-0001'},body:JSON.stringify({...orderBody,deliveryAddress:'Different address 2'})});assert.equal(altered.status,409);

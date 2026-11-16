@@ -1,3 +1,7 @@
+## Mission 6 legal/information page status — 16 November 2026
+
+The eleven information routes are available in local preview as informational/pre-launch content. AGB/Terms, Impressum, Privacy, and Returns are explicitly drafts, not approved legal policies. EUROFY is not registered; operator/address/tax identifiers remain absent by design. The contact page stores messages locally for admin review and does not send email. Do not use for public sales until qualified legal review, verified operator disclosures, actual supplier permissions, delivery terms, and live service readiness are established.
+
 ## Mission 5 language status — 16 November 2026
 
 - Storefront selector: exactly `ka/en/uk`; Georgian remains default.

@@ -330,10 +330,20 @@ app.post('/api/admin/categories',auth,admin,async(req,res)=>{
  try{const {rows}=await pool.query('INSERT INTO categories(name_ka,slug) VALUES($1,$2) RETURNING *',[name.trim(),slug]);res.status(201).json({category:rows[0]});}
  catch(e){res.status(e.code==='23505'?409:500).json({error:'Category could not be created'});}
 });
+const contactLimit=rateLimit({windowMs:60*60*1000,limit:5,standardHeaders:'draft-7',legacyHeaders:false});
+app.post('/api/contact',contactLimit,async(req,res)=>{
+ const b=req.body||{};if(typeof b.website==='string'&&b.website.trim())return res.status(202).json({accepted:true});
+ if(!safeText(b.name,120)||typeof b.email!=='string'||b.email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.email)||!safeText(b.subject,180)||!safeText(b.message,5000)||b.message.trim().length<10)return res.status(400).json({error:'Check the contact form fields'});
+ try{const {rows}=await pool.query('INSERT INTO eurofy_contact_messages(sender_name,sender_email,subject,message) VALUES($1,$2,$3,$4) RETURNING id,created_at',[b.name.trim(),b.email.trim().toLowerCase(),b.subject.trim(),b.message.trim()]);res.status(201).json({accepted:true,id:rows[0].id,createdAt:rows[0].created_at,delivery:'stored-for-admin-review-not-emailed'});}catch{res.status(503).json({error:'Contact messages are temporarily unavailable'});}
+});
+app.get('/api/admin/contact-messages',auth,admin,async(_req,res)=>{try{const {rows}=await pool.query('SELECT id,sender_name,sender_email,subject,message,status,created_at FROM eurofy_contact_messages ORDER BY created_at DESC LIMIT 500');res.json({messages:rows});}catch{res.status(500).json({error:'Unable to load contact messages'});}});
+app.patch('/api/admin/contact-messages/:id',auth,admin,async(req,res)=>{if(!uuid(req.params.id)||!['reviewed','closed'].includes(req.body?.status))return res.status(400).json({error:'Invalid contact message update'});try{const {rows}=await pool.query('UPDATE eurofy_contact_messages SET status=$2,reviewed_at=now(),reviewed_by=$3 WHERE id=$1 RETURNING id,status,reviewed_at',[req.params.id,req.body.status,req.user.id]);if(!rows.length)return res.status(404).json({error:'Contact message not found'});res.json({message:rows[0]});}catch{res.status(500).json({error:'Unable to update contact message'});}});
+
 if(process.env.EUROFY_SERVE_STORE==='1'){
  const projectRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
  app.get('/',(_req,res)=>res.sendFile(path.join(projectRoot,'index.html')));
  app.get('/admin.html',(_req,res)=>res.sendFile(path.join(projectRoot,'admin.html')));
+ app.get('/info.html',(_req,res)=>res.sendFile(path.join(projectRoot,'info.html')));
  app.get('/robots.txt',(_req,res)=>res.sendFile(path.join(projectRoot,'robots.txt')));
  app.use('/assets',express.static(path.join(projectRoot,'assets'),{dotfiles:'deny',fallthrough:true}));
 }

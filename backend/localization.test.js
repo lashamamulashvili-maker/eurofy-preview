@@ -45,3 +45,10 @@ test('storefront category navigation contains all stable categories with ka/en/u
   assert.equal((section.match(/ka:/g)||[]).length,15);assert.equal((section.match(/en:/g)||[]).length,15);assert.equal((section.match(/uk:/g)||[]).length,15);
   for(const marker of ['categoryBreadcrumb','subcategoryNav','catalogPagination','changeCatalogPage','price_asc'])assert.ok(html.includes(marker),`missing category UI control ${marker}`);
 });
+
+test('pre-launch information pages provide all required routes and three language content without invented company data',async()=>{
+  const html=await readFile(path.join(root,'info.html'),'utf8');
+  for(const id of ['about','contact','faq','shipping','returns','payment','cookies','privacy','terms','imprint','suppliers'])assert.ok(html.includes(id),`missing information page ${id}`);
+  assert.match(html,/<option value="ka">ქართული/);assert.match(html,/<option value="en">English/);assert.match(html,/<option value="uk">Українська/);assert.doesNotMatch(html,/<option value="ru">/);
+  assert.match(html,/not yet a registered business/);assert.match(html,/legal review required/);assert.match(html,/local development database/);assert.match(html,/It was not emailed/);
+});
