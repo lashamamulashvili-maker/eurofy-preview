@@ -1,3 +1,11 @@
+## Mission 6 — storefront category controls (16 November 2026)
+
+- Connected storefront category browsing to the paginated API: query, stable category slug, active subcategory, page, page size 24, and allowed sort order are sent to the backend.
+- Added category breadcrumb, published subcategory buttons with category-local counts, pagination controls, server result count, and translated ka/en/uk labels. Sorting supports newest, title, lowest price, and highest price.
+- Added localization regression checks for all 15 category IDs and the three-language labels/navigation controls.
+- Full backend suite passes 36/36. Inline storefront/admin/product-prep scripts and API pass Node syntax checks. Browser visual QA is still unavailable here.
+- Not complete: browser navigation/pagination was not manually exercised; legacy client-side brand/color/size filters are not all server-backed. Admin/product-prep full localization and product-subcategory assignment UI remain unfinished.
+
 ## Mission 6 continuation — category API paging and subcategory assignment
 
 - Added bounded catalog pagination (`page`, `limit`), sort whitelist (`newest`, `price_asc`, `price_desc`, `title_asc`), category and subcategory filters, and total/page metadata. Hidden category/subcategory offerings are excluded. Product admin update accepts a subcategory only when it belongs to the selected/current parent category.

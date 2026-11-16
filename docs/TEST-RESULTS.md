@@ -1,3 +1,13 @@
+## Mission 6 storefront category controls — 16 November 2026
+
+| Check | Result | Scope |
+|---|---|---|
+| `npm test` | PASS, 36/36 | Category UI localization contract plus API/migration/security regression suite |
+| Inline scripts `node --check` | PASS | Storefront, admin, product preparation |
+| API syntax `node --check` | PASS | Backend server |
+| `git diff --check` | PASS | Patch whitespace |
+| Browser visual interaction | NOT RUN | Browser tool cannot reach this local workspace |
+
 ## Mission 6 category paging slice — 16 November 2026
 
 | Check | Result | Scope |
