@@ -11,13 +11,17 @@
 - Customer order history and admin-only order listing
 - Orders are explicitly **unpaid**; no payment or shipment is initiated
 - Request size limits, basic input validation, rate limits, security headers, parameterized queries
+- Offline hybrid-route evaluation and fulfillment transition validation; the existing API routes do not yet call this module
+- Additive hybrid schema migration, checksum-tracked local migration runner, and transactional fulfillment repository with idempotency/audit checks
+- PGlite migration and repository tests run in memory; the hosted Render database has not been changed
 
 ## Local setup
 1. Install Node.js 20+ and PostgreSQL.
 2. Create a dedicated empty local database and apply `database/schema.sql` from the repository root: `createdb eurofy_local` then `psql postgresql://localhost/eurofy_local -v ON_ERROR_STOP=1 -f database/schema.sql`.
-3. In `backend/`, run `npm install` and `npm test`.
-4. Set `DATABASE_URL` to the local database URL, then run `npm start`. Stop it with Ctrl+C.
-5. Check `GET /api/health` and `GET /api/products` against local data.
+3. In `backend/`, run `npm install`. Set `DATABASE_URL` to `postgresql://localhost/eurofy_local` and run `npm run migrate:local`; the runner rejects non-loopback hosts and is not called by the API server.
+4. Run `npm test`.
+5. Start the API with `npm start`. Stop it with Ctrl+C.
+6. Check `GET /api/health` and `GET /api/products` against local data.
 
 ## Local backup and restore check
 

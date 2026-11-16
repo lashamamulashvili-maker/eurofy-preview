@@ -16,6 +16,7 @@
 | Customer account/orders | Demo orders only | Profile and unpaid order endpoints in source | Auth frontend and integration tests |
 | Admin | Source exists, not connected to storefront | Admin product, category, pricing, order, and manual supplier-feed routes | Audit log, controlled role assignment, integration tests |
 | Supplier purchases | Draft only | Offline offer/pricing helper; API supplier-purchase table | Supplier rights and API credentials; owner-approved purchase flow |
+| Hybrid routes | Domain logic implemented, not connected | Direct dropship vs EU forwarding assessment and status guard; additive schema migration tested in PGlite | Supplier permissions, verified route costs/ETA, API integration |
 | Warehouse | Planned | Shipments schema | Actual warehouse operations |
 | Georgia shipping | Planned | Shipment fields | Carrier contract and rates |
 | Payment | Disabled | payment_status unpaid | Provider contract and webhooks |

@@ -8,13 +8,17 @@ EUROFY sells products to customers in Georgia, purchases goods from an authorize
 - Outlet46 confirms delivery to an EU address; VAT is charged absent a valid EU VAT number. It does not provide API, CSV/XML feeds, or automated stock/price synchronization, so it is not suitable for automatic catalog sync.
 - Do not reuse product imagery without explicit license. AI editing does not itself grant reuse rights.
 
-## New offline foundation
-`backend/dropshipping.js` provides supplier offer validation, indicative landed-cost/margin calculation, and a draft supplier-order state that **cannot purchase anything**. Run `node --test backend/dropshipping.test.js` using Node 20+.
+## Offline foundations
+- `backend/dropshipping.js` validates supplier offers, computes indicative quotes, and prepares a draft supplier order that cannot purchase anything.
+- `backend/hybrid-fulfillment.js` evaluates direct-to-Georgia and EU-forwarding permissions, cost evidence, ETA, automatic recommendations, manual overrides, and transition guards.
+- `database/migrations/20261116_001_hybrid_fulfillment.sql` adds the hybrid storage schema without deleting existing rows; existing products default to `demo`.
+- `backend/migrate.js` only applies migrations to loopback PostgreSQL when explicitly run with `npm run migrate:local`.
+- Run `npm test` from `backend/`. Tests include embedded PostgreSQL migration checks. The Render migration has not been applied.
 
 ## Critical remaining work
 1. Confirm written supplier resale and image/catalog rights, eligible destinations, shipping rates, stock feeds, return handling, and API subscription costs.
-2. Build authenticated internal supplier catalog ingestion and database schema with versioned stock/price snapshots; block unauthorized or unverified listings.
-3. Add explicit order state machine: customer_order_received → payment_verified → supplier_order_review → supplier_order_placed → supplier_shipped → EU_received (when forwarding) → export/customs → delivered / return.
+2. Integrate authenticated supplier catalog ingestion and the new schema with versioned stock/price snapshots; block unauthorized or unverified listings.
+3. Connect the tested transition guard and two route models to transactional order APIs and shipment events.
 4. Implement idempotent payment webhooks only after owner-approved provider integration and legal review. Never mark orders paid from client input.
 5. Build shipping/customs estimates, VAT/tax treatment, consumer-rights disclosures, refund policy, and privacy compliance with qualified professional review.
 6. Add supplier API adapters in sandbox/mock mode, stock checks at checkout, shipment tracking, refund flows, and end-to-end tests.

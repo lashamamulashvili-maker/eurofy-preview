@@ -4,7 +4,9 @@
 
 Supplier adapters must be offline/mock by default. Import only supplier data EUROFY is authorized to use. Never scrape product pages or reuse catalog text/images without written rights. A feed/API response is not itself proof of resale authorization, image rights, delivery availability, or accurate stock.
 
-The current `backend/dropshipping.js` validates a supplier offer, computes an indicative quote, and creates a manual-review draft. It does not call a supplier, buy goods, or initiate payment. The API's current admin supplier-sync route accepts a manually submitted batch; it is not a provider connector and does not keep a versioned import history.
+The current `backend/dropshipping.js` validates a supplier offer, computes an indicative quote, and creates a manual-review draft. `backend/hybrid-fulfillment.js` evaluates direct-to-Georgia and EU-forwarding routes only from explicit permissions and sourced costs. It does not call a supplier, buy goods, or initiate payment. The API's current admin supplier-sync route accepts a manually submitted batch; it is not a provider connector and does not keep a versioned import history.
+
+The additive migration now provides supplier identity, per-product SKU/authorization, price and stock snapshots, image-license evidence, and fulfillment persistence tables. It has only been tested against embedded PostgreSQL. No supplier data was imported and the migration was not applied to Render.
 
 ## Syncee
 
@@ -27,3 +29,5 @@ Outlet46 has confirmed it does not offer an API, CSV/XML product feeds, or autom
 ## Adapter contract to implement
 
 Each provider adapter should expose offline-testable operations for catalog import, offer validation, live availability check, draft order preparation, order submission (disabled unless separately authorized), cancellation/return request, and tracking lookup. Persist source, supplier SKU, currency, source timestamp, authorization evidence reference, image-rights evidence, import result, and an immutable price/stock snapshot. Require an idempotency key for imports and any future order submission. Never expose supplier purchase price, credentials, or private supplier notes through public catalog responses.
+
+For fulfillment, store direct-shipping destinations separately from EU receiving destinations and onward-export destinations. Keep supplier delivery to an EU address separate from permission to resell and export the product to Georgia. The route engine will not recommend an option until verified, complete costs and a verified delivery window exist.

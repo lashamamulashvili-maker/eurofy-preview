@@ -16,3 +16,14 @@
 ## Current boundary
 
 No payment provider, real supplier order, customer charge, supplier API activation, or production deployment was made. The source is still a development foundation and is not production-ready. See [RELEASE-READINESS.md](RELEASE-READINESS.md) and [NEXT-STEPS.md](NEXT-STEPS.md).
+
+## 16 November 2026 — Mission 2 hybrid foundation
+
+- Re-verified the feature branch at `93bd277102db774f090023b8e1e5f83da5fc395c`, clean and aligned with `origin` before edits. Existing tests passed 11/11.
+- Created and verified pre-edit archive `/workspace/scratch/backups/eurofy-mission2-before-20261116T163747Z.tar.gz` (SHA-256 `49a58e5cfbc49e699560fdc5fe1490047c39b961a9a6132da37fa8a85da27cac`).
+- Re-checked Render PostgreSQL `eurofy-preview-db`: available, free plan, PostgreSQL 17, reported expiry 15 December 2026. Its IP allowlist is empty, which prevents the hosted read-only query tool from reaching it. No allowlist or service changes were made, and no schema/data/backup status could be inspected.
+- Added a tested hybrid-route evaluator, permission-aware route comparison, manual override audit record, fulfillment transition guard, additive database migration, and local-only migration runner. The migration defaults existing products to `demo` and does not delete or rewrite existing rows.
+- Added PGlite as a pinned development-only dependency, migration tests, and a transactional fulfillment repository with idempotent order-line creation and audit-backed state changes. Supplier submission remains disabled. Current result: `npm test` passes 29/29, including route/state, migration, and fulfillment persistence tests. A missing selected price-history timestamp was exposed and fixed. Evidence freshness is bounded (cost 24h, FX 72h, ETA 7d); inventory reservation prevents concurrent over-allocation. Syntax checks and `git diff --check` pass.
+- Remaining gap: the API routes and storefront do not yet call the hybrid repository/domain module. The migration has not been run against Render or any owner-controlled database.
+
+See [HYBRID-FULFILLMENT.md](HYBRID-FULFILLMENT.md) for the implementation plan and boundaries.
