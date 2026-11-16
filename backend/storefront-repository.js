@@ -4,11 +4,11 @@ const transaction=async(pool,fn)=>{const c=await pool.connect();try{await c.quer
 
 // Only returns supplier-backed offers with current stock/price, resale rights,
 // shipping permission to Georgia, and an explicitly verified image license.
-export async function listStoreProducts(pool,{search='',category='',limit=60}={}){
-  if(typeof search!=='string'||search.length>120||typeof category!=='string'||category.length>100||!Number.isInteger(limit)||limit<1||limit>100)throw new TypeError('Invalid catalog filters');
+export async function listStoreProducts(pool,{search='',category='',subcategory='',limit=60,offset=0,sort='newest'}={}){
+  if(typeof search!=='string'||search.length>120||typeof category!=='string'||category.length>100||typeof subcategory!=='string'||subcategory.length>100||!Number.isInteger(limit)||limit<1||limit>100||!Number.isInteger(offset)||offset<0||offset>1000000||!['newest','price_asc','price_desc','title_asc'].includes(sort))throw new TypeError('Invalid catalog filters');
   const term=search.trim();
-  const {rows}=await pool.query(`SELECT DISTINCT ON (p.id) p.id,p.title_ka,p.description_ka,p.price_gel_minor,
-      p.original_price_gel_minor,p.image_url,c.name_ka AS category,c.slug AS category_slug,
+  const {rows}=await pool.query(`SELECT *,count(*) OVER()::int AS total_count FROM (SELECT DISTINCT ON (p.id) p.id,p.title_ka,p.description_ka,p.created_at,p.price_gel_minor,
+      p.original_price_gel_minor,p.image_url,c.name_ka AS category,c.slug AS category_slug,sc.slug AS subcategory_slug,
       inv.quantity AS available_quantity,sp.supplier_sku,sp.currency_code,
       (sp.direct_shipping_enabled AND 'GE'=ANY(sp.direct_ship_countries) AND 'GE'=ANY(s.direct_ship_countries)) AS direct_eligible,
       (sp.eu_delivery_enabled AND cardinality(sp.eu_delivery_countries)>0 AND 'GE'=ANY(sp.onward_export_countries) AND 'GE'=ANY(s.onward_export_countries)) AS forwarding_eligible
@@ -18,6 +18,7 @@ export async function listStoreProducts(pool,{search='',category='',limit=60}={}
     JOIN LATERAL (SELECT availability,quantity,stale_after FROM eurofy_inventory_snapshots i WHERE i.supplier_product_id=sp.id ORDER BY checked_at DESC LIMIT 1) inv ON true
     JOIN LATERAL (SELECT price_minor,currency_code,observed_at FROM eurofy_supplier_price_history h WHERE h.supplier_product_id=sp.id ORDER BY observed_at DESC LIMIT 1) ph ON true
     LEFT JOIN categories c ON c.id=p.category_id
+    LEFT JOIN eurofy_subcategories sc ON sc.id=p.subcategory_id
     WHERE p.is_active=true AND p.publication_status='published'
       AND s.enabled=true AND s.resale_authorized=true AND s.resale_evidence_ref IS NOT NULL AND s.terms_verified_at IS NOT NULL
       AND sp.authorized_for_resale=true AND sp.authorization_evidence_ref IS NOT NULL AND sp.terms_verified_at IS NOT NULL
@@ -27,8 +28,14 @@ export async function listStoreProducts(pool,{search='',category='',limit=60}={}
       AND (sp.direct_shipping_enabled AND 'GE'=ANY(sp.direct_ship_countries) AND 'GE'=ANY(s.direct_ship_countries)
         OR sp.eu_delivery_enabled AND cardinality(sp.eu_delivery_countries)>0 AND 'GE'=ANY(sp.onward_export_countries) AND 'GE'=ANY(s.onward_export_countries))
       AND ($1='' OR p.title_ka ILIKE '%'||$1||'%' OR p.description_ka ILIKE '%'||$1||'%' OR c.name_ka ILIKE '%'||$1||'%' OR c.slug ILIKE '%'||$1||'%')
+      AND (c.id IS NULL OR c.is_published=true)
       AND ($2='' OR c.slug=$2 OR c.name_ka=$2)
-    ORDER BY p.id,sp.updated_at DESC LIMIT $3`,[term,category,limit]);
+      AND ($3='' OR (sc.slug=$3 AND sc.is_published=true))
+    ORDER BY p.id,sp.updated_at DESC) catalog
+    ORDER BY CASE WHEN $4='price_asc' THEN price_gel_minor END ASC NULLS LAST,
+      CASE WHEN $4='price_desc' THEN price_gel_minor END DESC NULLS LAST,
+      CASE WHEN $4='title_asc' THEN title_ka END ASC NULLS LAST,created_at DESC NULLS LAST,id
+    LIMIT $5 OFFSET $6`,[term,category,subcategory,sort,limit,offset]);
   return rows;
 }
 

@@ -1,3 +1,10 @@
+## Mission 6 continuation — category API paging and subcategory assignment
+
+- Added bounded catalog pagination (`page`, `limit`), sort whitelist (`newest`, `price_asc`, `price_desc`, `title_asc`), category and subcategory filters, and total/page metadata. Hidden category/subcategory offerings are excluded. Product admin update accepts a subcategory only when it belongs to the selected/current parent category.
+- Public category counts and localized descriptors continue to use persisted database rows. Storefront navigation from prior batch shows all 15 category labels in ka/en/uk.
+- Integration test exercises paginated/sorted response metadata and rejects unknown sort keys. Full test suite passed 35/35.
+- Product listing pages still lack a full breadcrumb, dynamic page controls, and robust subcategory navigation; admin has no dedicated product-subcategory assignment control yet. Mission-wide translation, import UI and legal pages remain open.
+
 ## Mission 6 Batch 2 — category storefront/API/admin slice
 
 - Verified remote and local feature branch at `14de98c9808f70848a6483aa0546de1141d72791` before editing; clean. Pre-edit backup: `/workspace/scratch/backups/eurofy-m6-resume-20261116T185258Z.tar.gz` (SHA-256 `2dcdfa4e968ebdfe3914186c3c55b63174f47b6c763f979eca0ec0cc5de04f61`).
