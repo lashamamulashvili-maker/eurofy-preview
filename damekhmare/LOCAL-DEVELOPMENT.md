@@ -7,11 +7,11 @@ No live payments, production deployment or external paid APIs.
 
 ## Setup
 1. Create a new disposable local PostgreSQL database for DAMEKHMARE.
-2. Apply `damekhmare/schema.sql` and then `damekhmare/seed.sql`.
+2. Apply `damekhmare/schema.sql`, `damekhmare/migrations/001-admin.sql`, then `damekhmare/seed.sql` in that order.
 3. `cd damekhmare/api && npm install`
 4. Set `DAMEKHMARE_DATABASE_URL` to the local database connection string.
 5. Run `npm test`, then `npm start`.
-6. Open `http://127.0.0.1:8002/preview/index.html` to view the separate design prototype.
+6. Open `http://127.0.0.1:8002/preview/index.html` for the design prototype, or `/preview/dashboard.html` for the integrated booking dashboard.\n7. All marketplace features are free. No monthly subscription or billing routes are active.
 
 Without a database, health and unauthenticated safety paths remain inspectable;
 database-backed routes correctly return 503. This is not a production-ready app.
@@ -28,6 +28,5 @@ database-backed routes correctly return 503. This is not a production-ready app.
 
 ## Known limitations
 Sessions are in process memory, not persistent. No email verification,
-password recovery, role verification, subscription entitlements, bookings,
-messaging, moderation, or production authorization audit yet.
+password recovery, verified end-to-end booking tests, full localization,\nproduction security hardening, or complete browser acceptance tests yet.
 Do not deploy this API publicly.
