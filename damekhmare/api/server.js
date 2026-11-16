@@ -2,7 +2,6 @@ import express from 'express';
 import {mountMarketplace} from './marketplace.js';
 import {mountBookings} from './bookings.js';
 import {mountCommunication} from './communication.js';
-import {mountSubscriptions} from './subscriptions.js';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import pg from 'pg';
@@ -63,7 +62,6 @@ app.post('/api/requests',auth,async(req,res)=>{
 mountMarketplace(app,{pool,auth});
 mountBookings(app,{pool,auth});
 mountCommunication(app,{pool,auth});
-mountSubscriptions(app,{pool,auth});
 const root=path.dirname(fileURLToPath(import.meta.url));
 app.use('/preview',express.static(path.resolve(root,'..'),{index:false}));
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){const port=Number(process.env.PORT||8002);app.listen(port,'127.0.0.1',()=>console.log('DAMEKHMARE local API on http://127.0.0.1:'+port))}
