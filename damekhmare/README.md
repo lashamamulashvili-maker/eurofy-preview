@@ -20,17 +20,14 @@ Do not repurpose the existing EUROFY product, order or shipment tables.
 Preserve the original backend and all user data.
 
 ## Commercial rules
-Browsing and registration free; 20 GEL/month per personal account for paid
-interaction capabilities, including accounts using both customer and provider roles.
-No commission. Real billing disabled until separate owner authorization.
-Renewal must be opt-in; test subscription states are not payments.
+The marketplace is **free during initial development and pilot use** for customers and providers. No monthly subscriptions, paid interaction gates, commissions, payment collection, checkout, or automatic renewals. Any future monetization requires a separate explicit owner decision. No billing features are active.
 
 ## Next implementation sequence
 1. Build an isolated Express marketplace router with schema validation, auth,
    server-side authorization, role checks, and integration tests.
 2. Build provider/customer onboarding and request/offer workflows.
 3. Add booking and participant-only messaging, verified reviews, admin moderation.
-4. Add subscription entitlement checks using mock payment state only.
+4. Keep all marketplace features free; do not enforce subscription entitlements.
 5. Run PostgreSQL migration and API tests against disposable local test DB.
 6. Complete accessibility, three-locale, responsive and browser acceptance tests.
 
