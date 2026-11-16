@@ -1,3 +1,13 @@
+# EUROFY Mission 5 — Russian-to-Ukrainian replacement (16 November 2026)
+
+- Verified branch `feature/eurofy-dropshipping-foundation` at `ab9a50ebafce987ba6ae23b126948c1f0fe98cbc`, clean and aligned with origin before edits. No production/main changes.
+- Verified pre-edit source backup: `/workspace/scratch/backups/eurofy-m5-before-20261116T182335Z.tar.gz` (SHA-256 `1c631b19fd74d06318475a208a72ed9cb17bca0275cb696a23b1eaf163e52fd3`).
+- Replaced active storefront Russian dictionary and legal-resource entries with Ukrainian, changed remaining checkout locale tuples to `uk`, retained Georgian and English, and expanded localization assertions. The selector contains only `ka`, `en`, and `uk`; legacy `eurofy_language=ru` migrates to `uk` without clearing unrelated local storage.
+- Browser preference remains local storage; database schema has no user-language preference column. No customer records or historical transactional text were modified.
+- Backend tests: PASS, 35/35. Database backup `/workspace/scratch/backups/eurofy-m5-db-checkpoint-20261116T183234Z.tar.gz` passed gzip integrity and was restored separately; all three applied migration checksums opened and the local database contains 0 users/orders/products.
+- Browser desktop/mobile QA could not run: Chromium launch is blocked by container socket permissions and connected browser automation cannot reach workspace localhost. No visual/device verification is claimed.
+- Remaining localization gap: `admin.html` and `product-prep.html` are Georgian-only; backend API validation messages are English. This batch is not complete platform-wide localization.
+
 # EUROFY development progress
 
 ## 16 November 2026 — isolated feature-branch audit

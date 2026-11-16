@@ -1,3 +1,11 @@
+## Mission 5 outstanding localization work
+
+1. Localize `admin.html` and `product-prep.html` in Georgian, English, and Ukrainian, including dynamic prompts/statuses and accessible labels.
+2. Localize backend validation/error responses, or add language-aware client error mapping with tests.
+3. Run desktop and mobile browser checks where browser automation can reach the local app.
+4. Extend translation tests to enumerate every active UI string and fail on missing Ukrainian values.
+5. Have Ukrainian legal/product content reviewed by a fluent professional before commercial use.
+
 # EUROFY next steps
 
 ## Mission 4 verified checkpoint — 16 November 2026

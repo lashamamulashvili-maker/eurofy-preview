@@ -1,3 +1,10 @@
+## Mission 5 language status — 16 November 2026
+
+- Storefront selector: exactly `ka/en/uk`; Georgian remains default.
+- Active storefront translation resources contain no Russian locale fields. Legacy browser preference `ru` migrates to `uk` without deleting other browser data. Historical content is untouched.
+- Storefront localization assertions pass as part of 35/35 backend tests; visual/mobile QA was not possible in this workspace.
+- **Release blocker:** localization is not platform-wide. `admin.html` and `product-prep.html` remain Georgian-only, API validation errors remain English, and Ukrainian wording has not received professional review.
+
 # EUROFY release readiness
 
 **Assessment date: 16 November 2026. Status: NOT READY for production commerce.**

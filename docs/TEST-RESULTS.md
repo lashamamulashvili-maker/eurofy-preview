@@ -1,3 +1,17 @@
+## Mission 5 localization verification — 16 November 2026
+
+| Check | Result | Scope |
+|---|---|---|
+| `npm test` in `backend/` | PASS, 35/35 | Supported locale list, legacy preference migration, core Ukrainian wording, removal of Russian locale resources |
+| Active storefront selector | PASS | Exactly Georgian (`ka`), English (`en`), Ukrainian (`uk`) |
+| Legacy `ru` browser preference | PASS by source assertion | Migrates only `eurofy_language`; does not clear local storage |
+| Source backup | PASS | gzip archive and SHA-256 recorded in progress log |
+| Local PGlite backup integrity and restore | PASS | Restored separately; three migration records and expected empty data tables verified |
+| Browser desktop/mobile localization | NOT RUN | Browser launch/localhost access blocked in this environment |
+| Admin/product-prep Ukrainian localization | NOT IMPLEMENTED | Georgian-only pages remain |
+
+This is not complete platform-wide localization. See `docs/DEVELOPMENT-PROGRESS.md` for remaining interface coverage.
+
 # EUROFY test results
 
 ## 16 November 2026
