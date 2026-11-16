@@ -11,8 +11,9 @@
 - Customer order history and admin-only order listing
 - Persistent authenticated carts, server-side eligibility/stock checks, and idempotent unpaid order requests; no payment or supplier shipment is initiated
 - Request size limits, basic input validation, rate limits, security headers, parameterized queries
-- Offline hybrid-route evaluation and fulfillment transition validation; the existing API routes do not yet call this module
-- Additive hybrid schema migrations, checksum-tracked local migration runner, transactional fulfillment repository, and order-request idempotency
+- Offline hybrid-route evaluation, fulfillment transition validation, and transactional reservation repository; supplier order submission remains blocked
+- Authenticated customer-owned Georgian address book, order details with fulfillment/parcel/shipment-event summaries, local-PGlite-only mock payment evidence, and admin-only hybrid fulfillment list/transition/package receipt APIs
+- Additive hybrid schema migrations, checksum-tracked local migration runner, and idempotent unpaid order requests
 - Local PGlite database stores persistent development data; integration tests exercise real HTTP catalog, auth, cart, and unpaid order-request paths. Render has not been changed
 
 ## Local setup (recommended: embedded PGlite)
@@ -48,7 +49,9 @@ Replace the final filename with the dump just created. Verify the restored datab
 - Complete secure browser authentication (avoid localStorage token persistence), admin workflows and audit logs.
 - Verify legal, privacy, tax, customs, returns and delivery requirements.
 - Integrate payment provider webhooks with signature validation and idempotency; **never** mark paid based on browser input.
-- Add order idempotency, inventory locking, shipping pricing and fulfillment workflows.
+- Connect verified route quotes to checkout; create order fulfillments and inventory reservations transactionally before payment verification.
+- Finish Ukrainian coverage; current language choice and core text are translated but help/legal/catalog/validation/admin coverage is partial.
+- Add browser-driven desktop/mobile checkout, accessibility checks, and admin endpoint workflows.
 - Run automated tests, vulnerability review, and full end-to-end QA before accepting real customer data.
 
 The current API is a development foundation, not production-ready ecommerce.

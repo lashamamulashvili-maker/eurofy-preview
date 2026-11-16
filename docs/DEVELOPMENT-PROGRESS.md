@@ -28,6 +28,19 @@ No payment provider, real supplier order, customer charge, supplier API activati
 
 See [HYBRID-FULFILLMENT.md](HYBRID-FULFILLMENT.md) for the implementation plan and boundaries.
 
+## 16 November 2026 — Mission 4 order operations and localization batch
+
+- Reconnected to `feature/eurofy-dropshipping-foundation` at `cde1901ccaaceabd93f5396212061a97441e1ec0`, clean and aligned with origin. Initial baseline was 32/32.
+- Pre-edit source and database backups are recorded above in Mission 4 recovery notes; before applying the next migration, database archive `/workspace/scratch/backups/eurofy-m4-db-pre-migration-20261116T180830Z.tar.gz` was verified (SHA-256 `ae615013b0c3355a6a7315e452e3ccd1022567a6aff14ccc159fae763cd9ed9f`). Local database inspection found 0 users, orders, and products, with the two expected migrations applied.
+- Added additive migration `20261116_003_order_operations.sql` for explicit payment mode, local mock-payment evidence (no card data), quote evidence timestamps, and EU forwarding package receipt/customs records. It was applied only to local PGlite; Render was not contacted for SQL or changed.
+- Added authenticated Georgian customer address-book API, owner-scoped order detail with fulfillment/package/shipment-event summaries, and an idempotent PGlite-only mock-payment evidence route. Admin hybrid-fulfillment list, audited transition API, and EU package receipt API are protected by admin role checks. The admin UI now reads the same-origin/local API by default and shows hybrid records; supplier purchasing remains disabled.
+- Removed Russian from the active language selector, enabled `ka/en/uk`, migrated the legacy `eurofy_language=ru` preference to `uk` without clearing browser data, added Ukrainian core storefront/status strings, and changed missing dictionary entries to use English where available. Ukrainian translation coverage is not complete across all help/legal/catalog/validation and admin text; this remains explicitly unfinished.
+- New automated coverage verifies local address creation/validation, owner-scoped order details, mock payment idempotency and test-only marking, customer denial from admin endpoints, active language choices, legacy preference migration, and core Ukrainian strings.
+- Current verification: `npm test` 34/34; inline scripts and `git diff --check` pass after the completed root-level check. Local migration 003 applied and verified. No browser/mobile visual E2E run was available.
+- Remaining critical gap: checkout still does not select persisted verified route quotes or create hybrid fulfillment records/reservations from customer orders. Do not use this build for commerce.
+- Final pre-commit validation again passed 34/34 tests after the address CRUD and legacy purchase-status safety changes; storefront/admin inline syntax and `git diff --check` pass.
+- Verified post-development checkpoints: source `/workspace/scratch/backups/eurofy-m4-source-checkpoint-20261116T181320Z.tar.gz` (SHA-256 `941c5ba4fb13938fd414e3145fe9b42758ded94c73c172da8bf4dbc45f75bbdf`) and local DB `/workspace/scratch/backups/eurofy-m4-db-checkpoint-20261116T181320Z.tar.gz` (SHA-256 `b20bedb155fa815b9f170e8d95da890d7788af39e89b74a997aadde92a5469b8`). The post-migration DB archive was extracted to a separate directory, reopened with PGlite, and verified to contain all three migration records and `eurofy_forwarding_packages`.
+
 ## 16 November 2026 — Mission 3 local storefront integration
 
 - Reconnected to the feature branch at `673718e54a523b6eef3592374911903ca21e28de`; branch was clean and aligned with origin. The 29/29 baseline suite passed before edits.

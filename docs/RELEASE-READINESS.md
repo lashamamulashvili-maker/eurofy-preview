@@ -28,3 +28,20 @@
 4. Review API and browser security, privacy, accessibility, database migrations, role assignment, and integration/E2E test results.
 5. Verify staging with mock payments and mock suppliers only; prove no duplicate order can be created and no payment or supplier purchase occurs on a failed/replayed event.
 6. Review the production service source branch and auto-deploy settings. Make any production change only after the owner explicitly authorizes that separate release action.
+
+## Mission 4 checkpoint — 16 November 2026
+
+| Area | Status | Evidence / remaining limit |
+|---|---|---|
+| Local order operations schema | Implemented locally | Migration 003 applied additively; no Render migration |
+| Customer address book | API implemented/tested | Authenticated owner-scoped `GE` addresses; storefront screens are not yet wired |
+| Mock payment evidence | Implemented/tested | Local PGlite only; no payment provider, card data, or real charge |
+| Customer order details | API implemented/tested | Owner scope; includes fulfillment/package/tracking records if records exist |
+| Hybrid fulfillment admin | API and read view implemented | Audit-backed transition route; no order-to-fulfillment checkout binding; supplier submission remains blocked |
+| EU package receipt | Implemented at API/admin read-view level | Only after a fulfillment exists; no true incoming parcel is created automatically |
+| Ukrainian localization | Partial | Russian option removed; legacy preference maps to Ukrainian; critical labels/status strings translated. Many copy, legal/help, validation, catalog and admin strings still use English/Georgian fallback. Not ready to claim full localization. |
+| Tests | PASS, 34/34 | Backend automated tests; no browser/mobile visual E2E or accessibility run |
+| Database recovery | Partial | Pre-migration archive hash/list verified; restore verification for exact Mission 4 archive still pending |
+| Production readiness | NOT READY | No verified commercial supplier rights/quotes, no customer quote selection or fulfillment creation, no live payment, legal/tax review outstanding, no deployment approved |
+
+No public deployment, main-branch change, Render database change, customer charge, supplier purchase, paid service, or external supplier API call was made.

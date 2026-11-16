@@ -52,3 +52,19 @@ The integration test started an isolated temporary PGlite database and local HTT
 The persistent working development database is local under `.eurofy-data/` and is ignored by Git. Render database metadata was checked read-only: available, free PostgreSQL 17, expiry 15 December 2026. The SQL query was blocked by its empty IP allowlist. No Render setting or database was modified. No purchase, charge, public deployment, or supplier API call occurred.
 
 The persistent `.eurofy-data/` archive was verified with `gzip -t`, restored into a separate temporary directory, reopened by PGlite, and checked for the users table and both recorded migrations. The source checkout backup and database backup are separate artifacts.
+
+## Mission 4 — 16 November 2026
+
+| Check | Result | Scope |
+|---|---|---|
+| `npm test` in `backend/` | PASS, 34/34 | Domain, fulfillment repository, migration, catalog/cart, HTTP integration, address book, order details, local mock payment, role denial, locale smoke coverage |
+| `npm run migrate:pglite` | PASS | Applied `20261116_003_order_operations.sql`; earlier migrations skipped by checksum |
+| Local PGlite data inspection | PASS | 0 users, orders, and products before migration; new tables verified at 0 rows |
+| Frontend/admin inline JavaScript syntax | PASS | `node --check` on extracted script blocks |
+| `git diff --check` | PASS | Patch formatting |
+| Browser-driven desktop/mobile E2E | NOT RUN | No browser automation dependency/suite is configured |
+| Database backup restore | PASS | Restored exact pre-migration and post-migration archives separately; reopened PGlite, verified rows/tables and the expected two/three migration records |
+
+Post-development source checkpoint: `/workspace/scratch/backups/eurofy-m4-source-checkpoint-20261116T181320Z.tar.gz`, SHA-256 `941c5ba4fb13938fd414e3145fe9b42758ded94c73c172da8bf4dbc45f75bbdf`. Post-migration PGlite checkpoint: `/workspace/scratch/backups/eurofy-m4-db-checkpoint-20261116T181320Z.tar.gz`, SHA-256 `b20bedb155fa815b9f170e8d95da890d7788af39e89b74a997aadde92a5469b8`.
+
+One early targeted test failed because its invalid-address fixture contained a valid seven-digit phone number; the fixture was corrected. One syntax-check attempt was run from `backend/` and referenced the storefront at the wrong relative path; it was rerun successfully from the repository root. These were harness/setup errors, not unresolved test failures.

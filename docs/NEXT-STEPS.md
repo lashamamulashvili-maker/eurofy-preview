@@ -1,5 +1,19 @@
 # EUROFY next steps
 
+## Mission 4 verified checkpoint — 16 November 2026
+
+Latest development branch work adds local mock payment evidence, customer address/order APIs, and admin hybrid package/status operations. 34 automated tests pass. The new UI language choices are Georgian, English, and Ukrainian, but translation coverage is partial; checkout route quote selection and fulfillment creation are still absent. No live payment, supplier order, or deployment is enabled.
+
+Immediate next work:
+
+1. Finish a customer-address and order-detail storefront UI that consumes the existing APIs.
+2. Implement a verified quote publication/selection flow that derives supplier permissions from database records, then atomically creates fulfillment and inventory reservations for order lines. Keep supplier ordering disabled.
+3. Connect admin state controls to the hybrid transition endpoint and forwarding package records; add positive and negative integration tests.
+4. Complete Ukrainian translations and test every reachable string in catalog, forms, account, status, notifications, admin, and legal/help pages; preserve old Russian transactional text.
+5. Add browser-based desktop/mobile checkout and accessibility tests.
+6. Verify restore of the exact Mission 4 backup, create a post-batch source/database checkpoint, and review persistent data-retention/backup policy.
+7. Confirm Syncee API enablement, legal resale/image rights, Georgia destinations, EU forwarding/export permission, actual quotes and fees, and provider payment evidence before considering commercial use.
+
 Prioritize work in this order. Items requiring a contract, account credential, fee, legal decision, or owner-controlled local machine remain blocked until those inputs exist.
 
 1. **Verify and back up the database.** The Render database is available/free and reported to expire 15 December 2026, but its empty IP allowlist blocks this environment. Confirm a backup and restore path from an authorized connection before expiry; do not open the database to this runner just to apply migrations.
