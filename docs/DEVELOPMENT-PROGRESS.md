@@ -56,3 +56,4 @@ See [HYBRID-FULFILLMENT.md](HYBRID-FULFILLMENT.md) for the implementation plan a
 - Local mode is bound to `127.0.0.1` and serves only the storefront, admin page, robots file, and approved assets. The API source, docs, migrations, and local database directory are not exposed as static files.
 
 - Final read-only Render metadata check: `eurofy-preview-db` is available, unsuspended, PostgreSQL 17, free plan, expiry 15 December 2026. Read-only SQL remains blocked by the empty IP allowlist. No Render setting or database was changed.
+- Mission 4 code batch commit `5f61916bac2deea696d4ddf99c29b308ea2bf165` was created on GitHub's development branch. Its tree hash matched the locally verified tree; the branch was fetched read-only and the local development/tracking refs now point to that exact remote commit. No main-branch update was made.

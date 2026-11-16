@@ -11,7 +11,7 @@ Immediate next work:
 3. Connect admin state controls to the hybrid transition endpoint and forwarding package records; add positive and negative integration tests.
 4. Complete Ukrainian translations and test every reachable string in catalog, forms, account, status, notifications, admin, and legal/help pages; preserve old Russian transactional text.
 5. Add browser-based desktop/mobile checkout and accessibility tests.
-6. Verify restore of the exact Mission 4 backup, create a post-batch source/database checkpoint, and review persistent data-retention/backup policy.
+6. Review persistent data-retention/backup policy; Mission 4 source and database checkpoints have been created and both database restores verified.
 7. Confirm Syncee API enablement, legal resale/image rights, Georgia destinations, EU forwarding/export permission, actual quotes and fees, and provider payment evidence before considering commercial use.
 
 Prioritize work in this order. Items requiring a contract, account credential, fee, legal decision, or owner-controlled local machine remain blocked until those inputs exist.
