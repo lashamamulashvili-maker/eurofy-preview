@@ -52,6 +52,18 @@ export function mountMarketplace(app,{pool,auth}){
    res.set('Cache-Control','no-store').json({offers:rows});
   }catch{unavailable(res)}
  });
+ app.get('/api/my/requests',auth,async(req,res)=>{
+  if(!pool)return unavailable(res);
+  try{const {rows}=await pool.query("SELECT r.id,r.title,r.description,r.city,r.status,r.created_at,c.slug AS category FROM dm_requests r JOIN dm_categories c ON c.id=r.category_id WHERE r.customer_id=$1 ORDER BY r.created_at DESC LIMIT 100",[req.account.id]);res.set('Cache-Control','no-store').json({requests:rows})}catch{unavailable(res)}
+ });
+ app.get('/api/my/offers',auth,async(req,res)=>{
+  if(!pool)return unavailable(res);
+  try{const {rows}=await pool.query("SELECT o.id,o.request_id,o.amount_gel_minor,o.note,o.status,o.created_at,r.title,r.city FROM dm_offers o JOIN dm_requests r ON r.id=o.request_id WHERE o.provider_id=$1 ORDER BY o.created_at DESC LIMIT 100",[req.account.id]);res.set('Cache-Control','no-store').json({offers:rows})}catch{unavailable(res)}
+ });
+ app.get('/api/provider/me',auth,async(req,res)=>{
+  if(!pool)return unavailable(res);
+  try{const {rows}=await pool.query("SELECT p.account_id,p.bio,p.city,p.service_area,p.verification_status FROM dm_provider_profiles p WHERE p.account_id=$1",[req.account.id]);res.set('Cache-Control','no-store').json({profile:rows[0]||null})}catch{unavailable(res)}
+ });
  // Admin identity is granted only by a trusted local database administrator.
  // Never accept admin claims from registration, profile updates or request payloads.
  app.get('/api/admin/pending-providers',auth,async(req,res)=>{
