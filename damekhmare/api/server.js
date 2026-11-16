@@ -1,5 +1,6 @@
 import express from 'express';
 import {mountMarketplace} from './marketplace.js';
+import {mountBookings} from './bookings.js';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import pg from 'pg';
@@ -58,6 +59,7 @@ app.post('/api/requests',auth,async(req,res)=>{
  try{const {rows}=await pool.query('INSERT INTO dm_requests(customer_id,category_id,title,description,city,remote_allowed) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,title,description,city,status,created_at',[req.account.id,categoryId,title.trim(),description.trim(),city.trim(),remoteAllowed]);res.status(201).json({request:rows[0]})}catch(e){res.status(e.code==='23503'?400:503).json({error:'Unable to create request'})}
 });
 mountMarketplace(app,{pool,auth});
+mountBookings(app,{pool,auth});
 const root=path.dirname(fileURLToPath(import.meta.url));
 app.use('/preview',express.static(path.resolve(root,'..'),{index:false}));
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){const port=Number(process.env.PORT||8002);app.listen(port,'127.0.0.1',()=>console.log('DAMEKHMARE local API on http://127.0.0.1:'+port))}
