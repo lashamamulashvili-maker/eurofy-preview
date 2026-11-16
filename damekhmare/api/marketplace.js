@@ -52,4 +52,26 @@ export function mountMarketplace(app,{pool,auth}){
    res.set('Cache-Control','no-store').json({offers:rows});
   }catch{unavailable(res)}
  });
+ // Admin identity is granted only by a trusted local database administrator.
+ // Never accept admin claims from registration, profile updates or request payloads.
+ app.get('/api/admin/pending-providers',auth,async(req,res)=>{
+  if(!pool)return unavailable(res);
+  if(!req.account.is_admin)return res.status(403).json({error:'Admin required'});
+  try{const {rows}=await pool.query("SELECT p.account_id,p.city,p.bio,p.service_area,p.created_at,a.display_name,a.email FROM dm_provider_profiles p JOIN dm_accounts a ON a.id=p.account_id WHERE p.verification_status='pending' ORDER BY p.created_at LIMIT 100");res.set('Cache-Control','no-store').json({providers:rows})}catch{unavailable(res)}
+ });
+ app.patch('/api/admin/providers/:id/verification',auth,async(req,res)=>{
+  if(!pool)return unavailable(res);
+  if(!req.account.is_admin)return res.status(403).json({error:'Admin required'});
+  if(!uuid(req.params.id)||!['approved','rejected'].includes(req.body?.status))return res.status(400).json({error:'Invalid verification'});
+  const client=await pool.connect().catch(()=>null);
+  if(!client)return unavailable(res);
+  try{
+   await client.query('BEGIN');
+   const {rows}=await client.query("UPDATE dm_provider_profiles SET verification_status=$2 WHERE account_id=$1 AND verification_status='pending' RETURNING account_id,verification_status",[req.params.id,req.body.status]);
+   if(!rows.length){await client.query('ROLLBACK');return res.status(409).json({error:'Profile not pending'})}
+   await client.query('INSERT INTO dm_audit_log(actor_id,action,subject_id) VALUES($1,$2,$3)',[req.account.id,'provider.verification.'+req.body.status,req.params.id]);
+   await client.query('COMMIT');res.set('Cache-Control','no-store').json({profile:rows[0]});
+  }catch{await client.query('ROLLBACK').catch(()=>{});unavailable(res)}finally{client.release()}
+ });
+
 }
