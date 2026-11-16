@@ -7,9 +7,12 @@
 | `npm run migrate:pglite` | PASS | Applied additive migration 006 locally; migrations 001–005 checksum-skipped |
 | Pre-migration DB backup restore | PASS | Restored separate archive, applied migration 006, prior migration checksums verified |
 | Post-migration DB backup restore | PASS | Reopened separate restored copy; all six migration records verified; 0 mock import jobs present |
-| Browser desktop/mobile visual QA | NOT RUN | No browser-driven E2E was available in this execution environment |
+| Local HTTP smoke | PASS | `/api/health` database connected; `/`, `/admin.html`, and `/info.html` returned HTTP 200 |
+| Browser desktop/mobile visual QA | BLOCKED | Installed Chromium aborts because the container denies Chrome's required socket operation; no visual QA claimed |
 
 Backups: source `/workspace/scratch/backups/eurofy-m6-final-pre-20261116T192414Z.tar.gz` (SHA-256 `39208201803fad688d4500e14f4c4cee3682fb1c262ec7749b7b9ca2fa8aa414`); pre-migration database `/workspace/scratch/backups/eurofy-m6-db-pre-import-20261116T193300Z.tar.gz` (SHA-256 `64a89544510220456cea6a1ef1b469ae6e0259e77e93ad4d63563a176b4e82d0`); post-migration database `/workspace/scratch/backups/eurofy-m6-db-checkpoint-20261116T194100Z.tar.gz` (SHA-256 `5fc053d6d78c46c1981e70ae16e00baba291deb30775a7c687bd7a44399977f2`). Each archive passed `gzip -t`; database archives were separately restored and opened.
+
+Post-development source checkpoint: `/workspace/scratch/backups/eurofy-m6-source-checkpoint-20261116T194700Z.tar.gz` (SHA-256 `631895847a0b454717bdbe7b969d208e70a719f64d4085546d4cfe7d7adab099`), verified with `gzip -t`. The source checkpoint reflects code commit `65144e4231216e3b7376bbf13265a0292ab269a2`; a subsequent docs-only commit records the final HTTP/browser limitation.
 
 ## Mission 6 contact and informational pages — 16 November 2026
 
